@@ -1,0 +1,28 @@
+# Arquivos de Ambiente Virtual e Dependências
+/backend/venv/
+/frontend/node_modules/
+
+# Arquivos de Cache e Compilados do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Banco de dados de desenvolvimento
+*.sqlite3
+db.sqlite3
+
+# Arquivos de Build do React
+/frontend/build/
+.DS_Store
+
+# Arquivos de IDE
+.vscode/
+.idea/
+
+# Arquivos de Mídia enviados pelos usuários
+/backend/media/
+
+# Arquivos de segredos (vamos criar um em breve)
+.env
+*.env
