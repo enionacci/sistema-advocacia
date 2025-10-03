@@ -1,5 +1,5 @@
 // src/pages/AcceptInvitationPage.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';

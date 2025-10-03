@@ -96,23 +96,47 @@ function ClientListPage() {
 
             <TableContainer component={Paper} elevation={3}>
                 <Table>
-                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}><TableRow>
-                        <TableCell>Nome Completo</TableCell>
-                        <TableCell>CPF</TableCell>
-                        <TableCell>E-mail</TableCell>
-                        <TableCell align="center">Ações</TableCell>
-                    </TableRow></TableHead>
+                    <TableHead sx={{ backgroundColor: '#f5f5f5' }}>
+                        <TableRow>
+                            <TableCell>Nome Completo</TableCell>
+                            <TableCell>CPF/CNPJ</TableCell>
+                            <TableCell>E-mail</TableCell>
+                            <TableCell>Telefone</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell align="center">Ações</TableCell>
+                        </TableRow>
+                    </TableHead>
                     <TableBody>
                         {clientData.results.map((client) => (
                             <TableRow key={client.id} hover>
-                                {/* --- A ALTERAÇÃO ESTÁ AQUI --- */}
                                 <TableCell>
                                     <Link to={`/clientes/${client.id}`} style={{ textDecoration: 'none', color: 'inherit', fontWeight: 'bold' }}>
                                         {client.nome_completo}
                                     </Link>
                                 </TableCell>
-                                <TableCell>{client.cpf}</TableCell>
+                                <TableCell>{client.cpf || client.cnpj || '-'}</TableCell>
                                 <TableCell>{client.email}</TableCell>
+                                <TableCell>{client.telefone_celular || client.telefone || '-'}</TableCell>
+                                <TableCell>
+                                    <Box 
+                                        sx={{ 
+                                            display: 'inline-block',
+                                            px: 1.5, 
+                                            py: 0.5, 
+                                            borderRadius: 1,
+                                            backgroundColor: client.status_cliente === 'Ativo' ? '#e8f5e9' : 
+                                                           client.status_cliente === 'Inativo' ? '#ffebee' : 
+                                                           '#fff3e0',
+                                            color: client.status_cliente === 'Ativo' ? '#2e7d32' : 
+                                                   client.status_cliente === 'Inativo' ? '#c62828' : 
+                                                   '#e65100',
+                                            fontSize: '0.875rem',
+                                            fontWeight: 'bold'
+                                        }}
+                                    >
+                                        {client.status_cliente || 'Ativo'}
+                                    </Box>
+                                </TableCell>
                                 <TableCell align="center">
                                     <IconButton title="Nova Consulta" color="secondary" onClick={() => navigate(`/clientes/${client.id}/nova-consulta`)}><MicIcon /></IconButton>
                                     <IconButton title="Editar Cliente" color="primary" onClick={() => navigate(`/clientes/${client.id}/edit`)}><EditIcon /></IconButton>

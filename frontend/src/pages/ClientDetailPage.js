@@ -115,10 +115,78 @@ function ClientDetailPage() {
 
             <Paper elevation={3} sx={{ p: 3, mb: 4 }}>
                 <Typography variant="h4" component="h1" gutterBottom>{client.nome_completo}</Typography>
-                <Typography><strong>CPF:</strong> {client.cpf}</Typography>
-                <Typography><strong>E-mail:</strong> {client.email}</Typography>
-                <Typography><strong>Telefone:</strong> {client.telefone || 'Não informado'}</Typography>
-                <Typography><strong>Endereço:</strong> {client.endereco || 'Não informado'}</Typography>
+                
+                {/* Dados Pessoais */}
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" sx={{ mt: 2, mb: 1, color: 'primary.main' }}>📋 Dados Pessoais</Typography>
+                    {client.cpf && <Typography><strong>CPF:</strong> {client.cpf}</Typography>}
+                    {client.cnpj && <Typography><strong>CNPJ:</strong> {client.cnpj}</Typography>}
+                    {client.rg && <Typography><strong>RG:</strong> {client.rg}</Typography>}
+                    {client.data_nascimento && <Typography><strong>Data de Nascimento:</strong> {new Date(client.data_nascimento).toLocaleDateString('pt-BR')}</Typography>}
+                    {client.estado_civil && <Typography><strong>Estado Civil:</strong> {client.estado_civil}</Typography>}
+                    {client.profissao && <Typography><strong>Profissão:</strong> {client.profissao}</Typography>}
+                    {client.razao_social && <Typography><strong>Razão Social:</strong> {client.razao_social}</Typography>}
+                    {client.nome_fantasia && <Typography><strong>Nome Fantasia:</strong> {client.nome_fantasia}</Typography>}
+                </Box>
+
+                {/* Contato */}
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" sx={{ mt: 2, mb: 1, color: 'primary.main' }}>📞 Contato</Typography>
+                    <Typography><strong>E-mail:</strong> {client.email}</Typography>
+                    {client.email_alternativo && <Typography><strong>E-mail Alternativo:</strong> {client.email_alternativo}</Typography>}
+                    {client.telefone_celular && <Typography><strong>Celular:</strong> {client.telefone_celular}</Typography>}
+                    {client.telefone_fixo && <Typography><strong>Telefone Fixo:</strong> {client.telefone_fixo}</Typography>}
+                    {client.preferencia_contato && <Typography><strong>Preferência:</strong> {client.preferencia_contato}</Typography>}
+                </Box>
+
+                {/* Endereço */}
+                {(client.logradouro || client.cidade) && (
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="h6" sx={{ mt: 2, mb: 1, color: 'primary.main' }}>🏠 Endereço</Typography>
+                        {client.logradouro && <Typography>{client.logradouro}{client.numero && `, ${client.numero}`}{client.complemento && ` - ${client.complemento}`}</Typography>}
+                        {client.bairro && <Typography>{client.bairro}</Typography>}
+                        {client.cidade && <Typography>{client.cidade}{client.estado && ` - ${client.estado}`} {client.cep && `| CEP: ${client.cep}`}</Typography>}
+                    </Box>
+                )}
+
+                {/* Dados da Advocacia */}
+                {(client.area_interesse || client.advogado_responsavel) && (
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="h6" sx={{ mt: 2, mb: 1, color: 'primary.main' }}>⚖️ Informações Jurídicas</Typography>
+                        {client.area_interesse && <Typography><strong>Área de Interesse:</strong> {client.area_interesse}</Typography>}
+                        {client.advogado_responsavel && <Typography><strong>Advogado Responsável:</strong> {client.advogado_responsavel}</Typography>}
+                        {client.data_primeiro_atendimento && <Typography><strong>Primeiro Atendimento:</strong> {new Date(client.data_primeiro_atendimento).toLocaleDateString('pt-BR')}</Typography>}
+                        {client.como_chegou && <Typography><strong>Como Chegou:</strong> {client.como_chegou}</Typography>}
+                    </Box>
+                )}
+
+                {/* Dados Familiares */}
+                {(client.nome_conjuge || client.contato_emergencia) && (
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="h6" sx={{ mt: 2, mb: 1, color: 'primary.main' }}>👨‍👩‍👧‍👦 Dados Familiares</Typography>
+                        {client.nome_conjuge && <Typography><strong>Cônjuge:</strong> {client.nome_conjuge}</Typography>}
+                        {client.regime_bens && <Typography><strong>Regime de Bens:</strong> {client.regime_bens}</Typography>}
+                        {client.representante_legal && <Typography><strong>Representante Legal:</strong> {client.representante_legal}</Typography>}
+                        {client.contato_emergencia && <Typography><strong>Contato de Emergência:</strong> {client.contato_emergencia}</Typography>}
+                    </Box>
+                )}
+
+                {/* Observações */}
+                {(client.observacoes || client.restricoes) && (
+                    <Box sx={{ mb: 2 }}>
+                        <Typography variant="h6" sx={{ mt: 2, mb: 1, color: 'primary.main' }}>📝 Observações</Typography>
+                        {client.observacoes && <Typography sx={{ whiteSpace: 'pre-wrap' }}><strong>Observações:</strong> {client.observacoes}</Typography>}
+                        {client.restricoes && <Typography sx={{ whiteSpace: 'pre-wrap' }}><strong>Restrições:</strong> {client.restricoes}</Typography>}
+                    </Box>
+                )}
+
+                {/* Status */}
+                <Box sx={{ mt: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                        <strong>Status:</strong> {client.status_cliente || 'Ativo'} | 
+                        <strong> Cadastrado em:</strong> {client.data_cadastro ? new Date(client.data_cadastro).toLocaleDateString('pt-BR') : 'N/A'}
+                    </Typography>
+                </Box>
             </Paper>
 
             <Typography variant="h5" component="h2" gutterBottom>Histórico de Consultas</Typography>
