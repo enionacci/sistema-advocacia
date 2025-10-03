@@ -10,3 +10,10 @@ class Consulta(models.Model):
 
     def __str__(self):
         return f"Consulta para {self.cliente.nome_completo} em {self.data_criacao.strftime('%d/%m/%Y')}"
+
+    def delete(self, *args, **kwargs):
+        # Primeiro, exclui o arquivo de áudio do armazenamento.
+        if self.audio_file:
+            self.audio_file.delete(save=False)
+        # Em seguida, chama o método delete original para remover o registro do banco de dados.
+        super().delete(*args, **kwargs)

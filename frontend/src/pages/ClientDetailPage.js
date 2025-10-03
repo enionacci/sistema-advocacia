@@ -135,6 +135,15 @@ function ClientDetailPage() {
                         </AccordionSummary>
                         <AccordionDetails>
                             <Box>
+                                {consulta.audio_file && (
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography variant="h6" gutterBottom>Áudio Original:</Typography>
+                                        <audio controls style={{ width: '100%' }}>
+                                            <source src={consulta.audio_file} type="audio/mpeg" />
+                                            Seu navegador não suporta o elemento de áudio.
+                                        </audio>
+                                    </Box>
+                                )}
                                 <Typography variant="h6" gutterBottom>Transcrição:</Typography>
                                 <Paper variant="outlined" sx={{ p: 2, mb: 2, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto' }}>
                                     {consulta.transcricao || "Transcrição pendente ou não disponível."}
