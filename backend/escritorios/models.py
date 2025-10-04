@@ -35,16 +35,51 @@ class Escritorio(models.Model):
         blank=True
     )
 
+    # --- Endereço ---
+    logradouro = models.CharField(max_length=255, blank=True, null=True, verbose_name="Logradouro")
+    numero = models.CharField(max_length=20, blank=True, null=True, verbose_name="Número")
+    complemento = models.CharField(max_length=100, blank=True, null=True, verbose_name="Complemento")
+    bairro = models.CharField(max_length=100, blank=True, null=True, verbose_name="Bairro")
+    cidade = models.CharField(max_length=100, blank=True, null=True, verbose_name="Cidade")
+    estado = models.CharField(max_length=2, blank=True, null=True, verbose_name="Estado (UF)")
+    cep = models.CharField(max_length=9, blank=True, null=True, verbose_name="CEP")
+
+    # --- Branding ---
+    logo = models.ImageField(upload_to='logos/', null=True, blank=True, verbose_name="Logotipo do Escritório")
+
     def __str__(self):
         return self.nome
 
 class PerfilUsuario(models.Model):
     """Estende o modelo de usuário padrão para vinculá-lo a um escritório."""
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='perfil')
-    escritorio = models.ForeignKey(Escritorio, on_delete=models.CASCADE, related_name='membros')
+    escritorio = models.ForeignKey(Escritorio, on_delete=models.CASCADE, related_name='membros', null=True, blank=True)
+    papeis = models.ManyToManyField('Papel', related_name='usuarios', blank=True)
 
     def __str__(self):
-        return f"{self.user.username} @ {self.escritorio.nome}"
+        if self.escritorio:
+            return f"{self.user.username} @ {self.escritorio.nome}"
+        return self.user.username
+
+class Permissao(models.Model):
+    """Representa uma permissão específica no sistema."""
+    nome = models.CharField(max_length=100, unique=True, verbose_name="Nome da Permissão")
+    codename = models.CharField(max_length=100, unique=True, verbose_name="Codename da Permissão")
+
+    def __str__(self):
+        return self.nome
+
+class Papel(models.Model):
+    """Representa um papel ou função que agrupa várias permissões."""
+    nome = models.CharField(max_length=100, verbose_name="Nome do Papel")
+    escritorio = models.ForeignKey(Escritorio, on_delete=models.CASCADE, related_name='papeis')
+    permissoes = models.ManyToManyField(Permissao, related_name='papeis', blank=True)
+
+    class Meta:
+        unique_together = ('nome', 'escritorio')
+
+    def __str__(self):
+        return f"{self.nome} ({self.escritorio.nome})"
 
 class Convite(models.Model):
     """Armazena um convite para um usuário se juntar a um escritório."""

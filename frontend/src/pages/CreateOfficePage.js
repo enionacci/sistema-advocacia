@@ -3,12 +3,14 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import { Container, Typography, Box, Paper, TextField, Button, CircularProgress } from '@mui/material';
+import { useAuth } from '../context/AuthContext';
 
 function CreateOfficePage() {
     const [nome, setNome] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const { refreshAuthData } = useAuth();
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -18,6 +20,7 @@ function CreateOfficePage() {
         try {
             await axiosInstance.post('/api/escritorios/', { nome });
             alert('Escritório criado com sucesso! Bem-vindo(a)!');
+            await refreshAuthData(); // Força a atualização do contexto
             navigate('/'); // Redireciona para o dashboard principal
         } catch (err) {
             console.error("Erro ao criar escritório:", err.response.data);

@@ -1,8 +1,9 @@
 // src/context/AuthContext.js
 
-import React, { createContext, useState, useContext, useEffect, useCallback } from 'react'; // 1. Import useCallback
+import React, { createContext, useState, useContext, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import axiosInstance from '../utils/axiosInstance';
 
 const AuthContext = createContext(null);
 
@@ -14,11 +15,47 @@ export const AuthProvider = ({ children }) => {
   } : null);
   
   const [user, setUser] = useState(null);
+  const [escritorio, setEscritorio] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // 2. Wrap loginAction in useCallback
+  const logoutAction = useCallback(() => {
+    setTokens(null);
+    setUser(null);
+    setEscritorio(null);
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    navigate('/login');
+  }, [navigate]);
+
+  const fetchAndSetAuthData = useCallback(async (accessToken) => {
+    setLoading(true);
+    try {
+      const userResponse = await axios.get('http://127.0.0.1:8000/api/auth/users/me/', {
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+      });
+      setUser(userResponse.data);
+
+      try {
+        const escritorioResponse = await axiosInstance.get('/api/meu-escritorio/');
+        setEscritorio(escritorioResponse.data);
+      } catch (escritorioError) {
+        if (escritorioError.response && escritorioError.response.status === 404) {
+          setEscritorio(null);
+        } else {
+          throw escritorioError;
+        }
+      }
+    } catch (e) {
+      console.log("Token inválido ou erro ao buscar dados, fazendo logout.");
+      logoutAction();
+    } finally {
+      setLoading(false);
+    }
+  }, [logoutAction]);
+
   const loginAction = useCallback(async (username, password) => {
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/auth/jwt/create/', {
+      const response = await axiosInstance.post('/api/auth/jwt/create/', {
         username, password
       });
       if (response.status === 200) {
@@ -26,15 +63,7 @@ export const AuthProvider = ({ children }) => {
         setTokens(data);
         localStorage.setItem('access_token', data.access);
         localStorage.setItem('refresh_token', data.refresh);
-        
-        const userResponse = await axios.get('http://127.0.0.1:8000/api/auth/users/me/', {
-          headers: {
-            'Authorization': `Bearer ${data.access}`
-          }
-        });
-        setUser(userResponse.data);
-
-        navigate('/');
+        await fetchAndSetAuthData(data.access); // Fetch data after login
         return true;
       }
     } catch (error) {
@@ -42,51 +71,34 @@ export const AuthProvider = ({ children }) => {
       alert('Erro: Usuário ou senha inválidos.');
       return false;
     }
-  }, [navigate]); // navigate is a dependency of this function
+  }, [fetchAndSetAuthData]);
 
-  // 3. Wrap logoutAction in useCallback
-  const logoutAction = useCallback(() => {
-    setTokens(null);
-    setUser(null);
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    navigate('/login');
-  }, [navigate]);
-
-  const loginActionWithTokens = useCallback((access, refresh, user) => {
+  const loginActionWithTokens = useCallback(async (access, refresh) => {
     const tokenData = { access, refresh };
     setTokens(tokenData);
-    setUser(user);
     localStorage.setItem('access_token', access);
     localStorage.setItem('refresh_token', refresh);
-  }, []);
-  
+    await fetchAndSetAuthData(access); // Fetch data after getting tokens
+  }, [fetchAndSetAuthData]);
+
+  useEffect(() => {
+    if (tokens) {
+      fetchAndSetAuthData(tokens.access);
+    } else {
+      setLoading(false);
+    }
+  }, []); // Run only once on initial load
+
   const contextData = {
     tokens,
     user,
+    escritorio,
+    loading,
     loginAction,
     logoutAction,
     loginActionWithTokens,
+    refreshAuthData: () => fetchAndSetAuthData(tokens.access), // Expose a refresh function
   };
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      if (tokens) {
-        try {
-          const userResponse = await axios.get('http://127.0.0.1:8000/api/auth/users/me/', {
-            headers: {
-              'Authorization': `Bearer ${tokens.access}`
-            }
-          });
-          setUser(userResponse.data);
-        } catch (e) {
-          console.log("Token inválido, fazendo logout.");
-          logoutAction();
-        }
-      }
-    };
-    fetchUser();
-  }, [tokens, logoutAction]); // 4. Add logoutAction to the dependency array
 
   return (
     <AuthContext.Provider value={contextData}>

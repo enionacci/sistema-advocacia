@@ -3,14 +3,22 @@
 from rest_framework import generics
 from .models import Cliente
 from .serializers import ClienteSerializer
-from rest_framework.permissions import IsAuthenticated 
+from rest_framework.permissions import IsAuthenticated
+from escritorios.permissions import HasPermission
 from rest_framework import generics, filters
 
 class ClienteListCreateView(generics.ListCreateAPIView):
     serializer_class = ClienteSerializer
-    permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter]
     search_fields = ['nome_completo', 'cpf', 'email']
+    permission_classes = [IsAuthenticated, HasPermission]
+
+    def check_permissions(self, request):
+        if request.method == 'POST':
+            self.required_permission = 'criar_cliente'
+        else:
+            self.required_permission = 'ver_cliente'
+        super().check_permissions(request)
 
     def get_queryset(self):
         """Este queryset retorna apenas clientes do escritório do usuário logado."""
@@ -23,7 +31,16 @@ class ClienteListCreateView(generics.ListCreateAPIView):
 
 class ClienteDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ClienteSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermission]
+
+    def check_permissions(self, request):
+        if request.method in ['PUT', 'PATCH']:
+            self.required_permission = 'editar_cliente'
+        elif request.method == 'DELETE':
+            self.required_permission = 'deletar_cliente'
+        else:
+            self.required_permission = 'ver_cliente'
+        super().check_permissions(request)
 
     def get_queryset(self):
         """Este queryset garante que o usuário só pode acessar clientes do seu próprio escritório."""

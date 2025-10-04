@@ -11,6 +11,7 @@ import ClientListPage from './pages/ClientListPage'; // Nossa nova lista
 import ClientCreatePage from './pages/ClientCreatePage'; // A página de criação renomeada
 import ClientEditPage from './pages/ClientEditPage';
 import PrivateRoute from './components/PrivateRoute';
+import AuthenticatedRoute from './components/AuthenticatedRoute';
 import ClientDetailPage from './pages/ClientDetailPage';
 import EscritorioPage from './pages/EscritorioPage';
 import RegisterPage from './pages/RegisterPage'; // Importa a nova página
@@ -18,13 +19,18 @@ import CreateOfficePage from './pages/CreateOfficePage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
 
 function App() {
-  const { user, logoutAction } = useAuth();
+  const { user, logoutAction, escritorio } = useAuth();
 
   return (
     <>
       <CssBaseline />
       <AppBar position="static">
         <Toolbar>
+          {escritorio && escritorio.logo && (
+            <Box sx={{ mr: 2 }}>
+              <img src={escritorio.logo} alt="Logotipo do Escritório" style={{ height: 40 }} />
+            </Box>
+          )}
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
             Sistema para Advocacia
           </Typography>
@@ -104,9 +110,9 @@ function App() {
           <Route 
             path="/criar-escritorio" 
             element={
-              <PrivateRoute>
+              <AuthenticatedRoute>
                 <CreateOfficePage />
-              </PrivateRoute>
+              </AuthenticatedRoute>
             } 
           />
 

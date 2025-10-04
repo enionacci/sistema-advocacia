@@ -1,5 +1,5 @@
 // src/pages/AcceptInvitationPage.js
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axiosInstance from '../utils/axiosInstance';
 import { useAuth } from '../context/AuthContext';
@@ -16,8 +16,21 @@ function AcceptInvitationPage() {
         password: '',
         password2: ''
     });
+    const [invitationDetails, setInvitationDetails] = useState({ email: '', escritorio_nome: '' });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    useEffect(() => {
+        const fetchInvitationDetails = async () => {
+            try {
+                const response = await axiosInstance.get(`/api/convites/${token}/`);
+                setInvitationDetails(response.data);
+            } catch (err) {
+                setError('Não foi possível carregar os detalhes do convite. Ele pode ser inválido ou ter expirado.');
+            }
+        };
+        fetchInvitationDetails();
+    }, [token]);
 
     const handleChange = (e) => {
         setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -41,15 +54,14 @@ function AcceptInvitationPage() {
                 last_name: formData.last_name,
             });
 
-            // O backend retorna os tokens, então fazemos o login diretamente
-            const { access, refresh, user } = response.data;
-            loginActionWithTokens(access, refresh, user);
+            const { access, refresh } = response.data;
+            await loginActionWithTokens(access, refresh);
             
-            navigate('/'); // Redireciona para o dashboard principal
+            navigate('/');
 
         } catch (err) {
-            console.error("Erro ao aceitar o convite:", err.response.data);
-            setError(err.response.data.detail || 'Ocorreu um erro. O convite pode ser inválido ou já ter sido usado.');
+            console.error("Erro ao aceitar o convite:", err.response?.data);
+            setError(err.response?.data?.detail || 'Ocorreu um erro. O convite pode ser inválido ou já ter sido usado.');
         } finally {
             setLoading(false);
         }
@@ -62,9 +74,19 @@ function AcceptInvitationPage() {
                     Finalize seu Cadastro
                 </Typography>
                 <Typography variant="body1" sx={{ mt: 1, textAlign: 'center' }}>
-                    Você foi convidado a se juntar a um escritório. Por favor, complete seu cadastro definindo uma senha.
+                    Você foi convidado para se juntar ao escritório <strong>{invitationDetails.escritorio_nome}</strong>. 
+                    Por favor, complete seu cadastro definindo uma senha.
                 </Typography>
                 <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+                    <TextField
+                        margin="normal"
+                        fullWidth
+                        id="email"
+                        label="Email"
+                        name="email"
+                        value={invitationDetails.email}
+                        disabled
+                    />
                     <TextField
                         margin="normal"
                         fullWidth
@@ -112,7 +134,7 @@ function AcceptInvitationPage() {
                         fullWidth
                         variant="contained"
                         sx={{ mt: 3, mb: 2 }}
-                        disabled={loading}
+                        disabled={loading || !invitationDetails.email}
                     >
                         {loading ? <CircularProgress size={24} /> : 'Criar Conta e Entrar'}
                     </Button>

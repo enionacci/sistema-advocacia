@@ -4,14 +4,20 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 const PrivateRoute = ({ children }) => {
-  const { tokens } = useAuth(); // Usa nosso hook para pegar os tokens
+  const { user, escritorio, tokens, loading } = useAuth();
+
+  if (loading) {
+    return <div>Carregando...</div>; // Ou um spinner
+  }
 
   if (!tokens) {
-    // Se não houver token, redireciona para a página de login
     return <Navigate to="/login" />;
   }
 
-  // Se houver token, renderiza o componente filho (a página protegida)
+  if (!escritorio) {
+    return <Navigate to="/criar-escritorio" />;
+  }
+
   return children;
 };
 

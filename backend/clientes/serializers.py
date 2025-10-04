@@ -6,4 +6,5 @@ from .models import Cliente
 class ClienteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Cliente
-        fields = '__all__' # Inclui todos os campos do nosso modelo
+        fields = '__all__'
+        read_only_fields = ['escritorio']

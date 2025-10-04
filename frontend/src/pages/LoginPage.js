@@ -1,20 +1,26 @@
 // src/pages/LoginPage.js
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Box, TextField, Button, Typography, Container, Paper } from '@mui/material';
 
 function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { loginAction } = useAuth(); // 2. Pegar a função de login do contexto
+  const { loginAction } = useAuth();
+  const navigate = useNavigate();
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-    await loginAction(username, password); // 3. Chamar a função de login do contexto
+    try {
+      await loginAction(username, password);
+      navigate('/');
+    } catch (error) {
+      console.error("Failed to login:", error);
+      // Optionally, display an error message to the user
+    }
   };
 
-  // O resto do return continua igual...
   return (
     <Container component="main" maxWidth="xs" sx={{ display: 'flex', alignItems: 'center', height: '80vh' }}>
       <Paper elevation={6} sx={{ p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>

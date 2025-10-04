@@ -2,6 +2,7 @@
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from escritorios.permissions import HasPermission
 from django.shortcuts import get_object_or_404
 from django.conf import settings
 import openai
@@ -13,7 +14,8 @@ from .serializers import AnaliseIASerializer
 class AnaliseIADestroyView(generics.DestroyAPIView):
     queryset = AnaliseIA.objects.all()
     serializer_class = AnaliseIASerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'deletar_analise'
 
     def get_queryset(self):
         """Permite excluir apenas análises de consultas do escritório do usuário."""
@@ -21,7 +23,8 @@ class AnaliseIADestroyView(generics.DestroyAPIView):
         return AnaliseIA.objects.filter(consulta__cliente__escritorio=user.perfil.escritorio)
 
 class AnalisarConsultaView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'criar_analise'
     serializer_class = AnaliseIASerializer
 
     def post(self, request, *args, **kwargs):

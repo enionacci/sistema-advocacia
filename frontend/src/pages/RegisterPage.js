@@ -7,7 +7,6 @@ import { Container, Typography, Box, Paper, TextField, Button, CircularProgress 
 
 function RegisterPage() {
     const [formData, setFormData] = useState({
-        username: '',
         email: '',
         password: '',
         password2: ''
@@ -34,20 +33,20 @@ function RegisterPage() {
         try {
             // 1. Cria o usuário
             await axiosInstance.post('/api/auth/users/', {
-                username: formData.username,
+                username: formData.email, // Usa o email como username
                 email: formData.email,
                 password: formData.password
             });
 
             // 2. Faz o login para obter os tokens
-            await loginAction(formData.username, formData.password);
+            await loginAction(formData.email, formData.password); // Usa o email como username para login
 
             // 3. Redireciona para a página de criação de escritório
             navigate('/criar-escritorio');
 
         } catch (err) {
-            console.error("Erro no registro:", err.response.data);
-            setErrors(err.response.data || { general: 'Ocorreu um erro ao tentar se registrar.' });
+            console.error("Erro no registro:", err.response?.data);
+            setErrors(err.response?.data || { general: 'Ocorreu um erro ao tentar se registrar.' });
             alert('Falha no registro. Verifique os erros.');
         } finally {
             setLoading(false);
@@ -61,20 +60,6 @@ function RegisterPage() {
                     Criar Conta
                 </Typography>
                 <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1 }}>
-                    <TextField
-                        margin="normal"
-                        required
-                        fullWidth
-                        id="username"
-                        label="Nome de Usuário"
-                        name="username"
-                        autoComplete="username"
-                        autoFocus
-                        value={formData.username}
-                        onChange={handleChange}
-                        error={!!errors.username}
-                        helperText={errors.username}
-                    />
                     <TextField
                         margin="normal"
                         required

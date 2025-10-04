@@ -83,6 +83,7 @@ function FormularioCliente() {
   const navigate = useNavigate();
   const { clientId } = useParams(); // Pega o ID da URL, se existir
   const isEditMode = Boolean(clientId); // Verifica se estamos no modo de edição
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     // Se estiver no modo de edição, busca os dados do cliente
@@ -104,21 +105,35 @@ function FormularioCliente() {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    setErrors({}); // Limpa os erros antigos
+
+    // Cria um novo payload e converte strings vazias em null
+    const payload = {};
+    Object.keys(formData).forEach(key => {
+      if (formData[key] === '') {
+        payload[key] = null;
+      } else {
+        payload[key] = formData[key];
+      }
+    });
 
     try {
       if (isEditMode) {
-        // Se estiver editando, usa o método PUT
-        await axiosInstance.put(`/api/clientes/${clientId}/`, formData);
+        await axiosInstance.put(`/api/clientes/${clientId}/`, payload);
         alert(`Cliente ${formData.nome_completo} atualizado com sucesso!`);
       } else {
-        // Se estiver criando, usa o método POST
-        await axiosInstance.post('/api/clientes/', formData);
+        await axiosInstance.post('/api/clientes/', payload);
         alert(`Cliente ${formData.nome_completo} salvo com sucesso!`);
       }
-      navigate('/'); // Redireciona para a lista após a operação
+      navigate('/');
     } catch (error) {
-      console.error('Houve um erro:', error);
-      alert('Erro ao salvar os dados. Verifique o console.');
+      if (error.response && error.response.status === 400) {
+        setErrors(error.response.data);
+        alert('Por favor, corrija os erros no formulário.');
+      } else {
+        console.error('Houve um erro:', error);
+        alert('Erro ao salvar os dados. Verifique o console.');
+      }
     }
   };
 
@@ -153,6 +168,8 @@ function FormularioCliente() {
                   onChange={handleChange} 
                   required 
                   fullWidth 
+                  error={!!errors.nome_completo}
+                  helperText={errors.nome_completo ? errors.nome_completo[0] : ''}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -348,6 +365,8 @@ function FormularioCliente() {
                   onChange={handleChange} 
                   required 
                   fullWidth 
+                  error={!!errors.email}
+                  helperText={errors.email ? errors.email[0] : ''}
                 />
               </Grid>
               <Grid size={4} item xs={12} sm={6}>

@@ -1,16 +1,22 @@
 # escritorios/views.py
-from rest_framework import generics, status
+from rest_framework import generics, status, parsers
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import Escritorio, PerfilUsuario, Convite
+from .models import Escritorio, PerfilUsuario, Convite, Papel, Permissao
 from django.contrib.auth.models import User
-from .serializers import EscritorioSerializer, ConviteSerializer, AcceptInvitationSerializer, PerfilUsuarioSerializer
-from .permissions import CanCreateEscritorio
+from .serializers import EscritorioSerializer, ConviteSerializer, AcceptInvitationSerializer, PerfilUsuarioSerializer, PapelSerializer, PermissaoSerializer, PerfilUsuarioPapelUpdateSerializer, InvitationDetailSerializer
+from .permissions import CanCreateEscritorio, HasPermission
 from django.utils import timezone
 from datetime import timedelta
 from django.core.mail import send_mail
 from django.conf import settings
 from rest_framework_simplejwt.tokens import RefreshToken
+
+class InvitationDetailView(generics.RetrieveAPIView):
+    queryset = Convite.objects.filter(status='pending')
+    serializer_class = InvitationDetailSerializer
+    lookup_field = 'token'
 
 class MembroDestroyView(generics.DestroyAPIView):
     """
@@ -48,17 +54,36 @@ class AcceptInvitationView(generics.GenericAPIView):
             return Response({"detail": "Um usuário com este e-mail já existe."}, status=status.HTTP_400_BAD_REQUEST)
         
         # Cria o novo usuário
-        username = convite.email.split('@')[0]
+        first_name = data.get('first_name', '')
+        last_name = data.get('last_name', '')
+        
+        # Usa o e-mail como nome de usuário
+        username = convite.email
+
+        # Verifica se o nome de usuário (e-mail) já existe
+        if User.objects.filter(username=username).exists():
+            return Response({"detail": "Um usuário com este e-mail já existe."}, status=status.HTTP_400_BAD_REQUEST)
+
         user = User.objects.create_user(
-            username=username, # Ou pode pedir um username no form
+            username=username,
             email=convite.email,
             password=data.get('password'),
-            first_name=data.get('first_name', ''),
-            last_name=data.get('last_name', '')
+            first_name=first_name,
+            last_name=last_name
         )
 
-        # Vincula o usuário ao escritório
-        PerfilUsuario.objects.create(user=user, escritorio=convite.escritorio)
+        # Vincula o usuário ao escritório e atribui um papel padrão
+        perfil_usuario = user.perfil
+        perfil_usuario.escritorio = convite.escritorio
+        perfil_usuario.save()
+
+        # Atribui o papel de "Membro" por padrão
+        try:
+            papel_membro = Papel.objects.get(escritorio=convite.escritorio, nome="Membro")
+            perfil_usuario.papeis.add(papel_membro)
+        except Papel.DoesNotExist:
+            # Opcional: logar que o papel padrão não foi encontrado
+            pass
 
         # Atualiza o status do convite
         convite.status = 'accepted'
@@ -129,8 +154,32 @@ class EscritorioCreateView(generics.CreateAPIView):
         trial_end_date = timezone.now() + timedelta(days=120)
         escritorio = serializer.save(data_expiracao_teste=trial_end_date)
 
-        # Cria o PerfilUsuario para vincular o usuário logado ao novo escritório
-        PerfilUsuario.objects.create(user=self.request.user, escritorio=escritorio)
+        # Associa o escritório ao perfil de usuário existente
+        perfil_usuario = self.request.user.perfil
+        perfil_usuario.escritorio = escritorio
+        perfil_usuario.save()
+
+        # --- Criação de Papéis e Permissões Padrão ---
+        # Papel de Administrador com todas as permissões
+        admin_papel = Papel.objects.create(nome="Administrador", escritorio=escritorio)
+        todas_permissoes = Permissao.objects.all()
+        admin_papel.permissoes.set(todas_permissoes)
+
+        # Papel de Membro com permissões básicas
+        membro_papel = Papel.objects.create(nome="Membro", escritorio=escritorio)
+        permissoes_membro = Permissao.objects.filter(
+            codename__in=[
+                'ver_cliente', 'criar_cliente', 'editar_cliente',
+                'ver_consulta', 'criar_consulta',
+                'ver_analise', 'criar_analise',
+            ]
+        )
+        membro_papel.permissoes.set(permissoes_membro)
+
+        # Atribui o papel de Administrador ao usuário que criou o escritório
+        perfil_usuario.papeis.add(admin_papel)
+
+from rest_framework.exceptions import NotFound
 
 class MinhaEscritorioView(generics.RetrieveUpdateAPIView):
     """
@@ -138,7 +187,55 @@ class MinhaEscritorioView(generics.RetrieveUpdateAPIView):
     """
     serializer_class = EscritorioSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     def get_object(self):
         """Retorna o escritório associado ao usuário logado."""
-        return self.request.user.perfil.escritorio
+        try:
+            escritorio = self.request.user.perfil.escritorio
+            if escritorio is None:
+                raise NotFound("Nenhum escritório associado a este usuário.")
+            return escritorio
+        except PerfilUsuario.DoesNotExist:
+            raise NotFound("Nenhum perfil de usuário associado a este usuário.")
+
+class PermissaoListView(generics.ListAPIView):
+    """ Lista todas as permissões disponíveis no sistema. """
+    queryset = Permissao.objects.all()
+    serializer_class = PermissaoSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'gerenciar_papeis'
+    pagination_class = None
+
+class PapelListCreateView(generics.ListCreateAPIView):
+    """ Lista ou cria papéis para o escritório do usuário. """
+    serializer_class = PapelSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'gerenciar_papeis'
+    pagination_class = None
+
+    def get_queryset(self):
+        return Papel.objects.filter(escritorio=self.request.user.perfil.escritorio)
+
+    def perform_create(self, serializer):
+        serializer.save(escritorio=self.request.user.perfil.escritorio)
+
+class PapelDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """ Recupera, atualiza ou deleta um papel específico. """
+    serializer_class = PapelSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'gerenciar_papeis'
+
+    def get_queryset(self):
+        return Papel.objects.filter(escritorio=self.request.user.perfil.escritorio)
+
+class PerfilUsuarioPapelUpdateView(generics.UpdateAPIView):
+    """ Atualiza os papéis de um usuário específico. """
+    queryset = PerfilUsuario.objects.all()
+    serializer_class = PerfilUsuarioPapelUpdateSerializer
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'gerenciar_membros'
+
+    def get_queryset(self):
+        # Garante que só se pode editar usuários do próprio escritório
+        return PerfilUsuario.objects.filter(escritorio=self.request.user.perfil.escritorio)

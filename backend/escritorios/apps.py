@@ -4,3 +4,6 @@ from django.apps import AppConfig
 class EscritoriosConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'escritorios'
+
+    def ready(self):
+        import escritorios.signals

@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from .models import Consulta
 from .serializers import ConsultaSerializer
 from rest_framework.permissions import IsAuthenticated
+from escritorios.permissions import HasPermission
 from clientes.models import Cliente
 
 import openai
@@ -14,7 +15,8 @@ import subprocess
 class ConsultaCreateView(generics.CreateAPIView):
     queryset = Consulta.objects.all()
     serializer_class = ConsultaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'criar_consulta'
     parser_classes = [parsers.MultiPartParser, parsers.FormParser]
 
     def create(self, request, *args, **kwargs):
@@ -103,7 +105,8 @@ class ConsultaCreateView(generics.CreateAPIView):
     
 class ConsultaListView(generics.ListAPIView):
     serializer_class = ConsultaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'ver_consulta'
 
     def get_queryset(self):
         """Retorna consultas de um cliente específico, se ele pertencer ao escritório do usuário."""
@@ -116,7 +119,8 @@ class ConsultaListView(generics.ListAPIView):
 
 class ConsultaDestroyView(generics.DestroyAPIView):
     serializer_class = ConsultaSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, HasPermission]
+    required_permission = 'deletar_consulta'
 
     def get_queryset(self):
         """Permite excluir apenas consultas de clientes do escritório do usuário."""
