@@ -38,6 +38,7 @@ import {
   FilterList as FilterIcon,
   Clear as ClearIcon,
   Assessment as AssessmentIcon,
+  ArrowBack as ArrowBackIcon,
 } from '@mui/icons-material';
 import { listAuditLogs, formatAction, formatTimestamp } from '../utils/auditLogService';
 
@@ -141,9 +142,18 @@ const AuditLogListPage = () => {
     <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
       {/* Cabeçalho */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" component="h1">
-          Logs de Auditoria
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<ArrowBackIcon />}
+            onClick={() => navigate(-1)}
+          >
+            Voltar
+          </Button>
+          <Typography variant="h4" component="h1">
+            Logs de Auditoria
+          </Typography>
+        </Box>
         <Button
           variant="outlined"
           startIcon={<AssessmentIcon />}

@@ -20,6 +20,7 @@ import AcceptInvitationPage from './pages/AcceptInvitationPage';
 import AuditLogListPage from './pages/AuditLogListPage';
 import AuditLogDetailPage from './pages/AuditLogDetailPage';
 import AuditLogStatsPage from './pages/AuditLogStatsPage';
+import DocumentosPage from './pages/DocumentosPage';
 
 function App() {
   const { user, logoutAction, escritorio } = useAuth();
@@ -141,6 +142,16 @@ function App() {
             element={
               <PrivateRoute>
                 <AuditLogDetailPage />
+              </PrivateRoute>
+            } 
+          />
+
+          {/* Rotas de Documentos */}
+          <Route 
+            path="/documentos" 
+            element={
+              <PrivateRoute>
+                <DocumentosPage />
               </PrivateRoute>
             } 
           />

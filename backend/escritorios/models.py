@@ -60,6 +60,25 @@ class PerfilUsuario(models.Model):
         if self.escritorio:
             return f"{self.user.username} @ {self.escritorio.nome}"
         return self.user.username
+    
+    def tem_permissao(self, codename):
+        """
+        Verifica se o usuário tem uma permissão específica através de seus papéis.
+        
+        Args:
+            codename (str): O codename da permissão (ex: 'ver_cliente', 'criar_documento')
+        
+        Returns:
+            bool: True se o usuário tem a permissão, False caso contrário
+        """
+        # Verifica se o usuário é superusuário
+        if self.user.is_superuser:
+            return True
+        
+        # Busca em todos os papéis do usuário
+        return self.papeis.filter(
+            permissoes__codename=codename
+        ).exists()
 
 class Permissao(models.Model):
     """Representa uma permissão específica no sistema."""

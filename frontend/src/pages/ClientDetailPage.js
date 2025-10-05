@@ -5,12 +5,14 @@ import axiosInstance from '../utils/axiosInstance';
 import { 
     Container, Typography, Box, Paper, CircularProgress, Button,
     Accordion, AccordionSummary, AccordionDetails, IconButton,
-    Dialog, DialogTitle, DialogContent, DialogActions, TextField
+    Dialog, DialogTitle, DialogContent, DialogActions, TextField,
+    Tabs, Tab
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import PsychologyIcon from '@mui/icons-material/Psychology';
+import ClientDocuments from '../components/ClientDocuments';
 
 function ClientDetailPage() {
     const { clientId } = useParams();
@@ -22,6 +24,7 @@ function ClientDetailPage() {
     const [currentConsulta, setCurrentConsulta] = useState(null);
     const [analysisContext, setAnalysisContext] = useState('');
     const [analysisLoading, setAnalysisLoading] = useState(false);
+    const [tabValue, setTabValue] = useState(0);
 
     const fetchData = useCallback(async () => {
         try {
@@ -189,86 +192,104 @@ function ClientDetailPage() {
                 </Box>
             </Paper>
 
-            <Typography variant="h5" component="h2" gutterBottom>Histórico de Consultas</Typography>
+            {/* Tabs para Consultas e Documentos */}
+            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+                <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+                    <Tab label="Consultas" />
+                    <Tab label="Documentos" />
+                </Tabs>
+            </Box>
 
-            {consultations.length > 0 ? (
-                consultations.map((consulta) => (
-                    <Accordion key={consulta.id}>
-                        <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                                <Typography sx={{ flexGrow: 1 }}>
-                                    Consulta de {new Date(consulta.data_criacao).toLocaleDateString('pt-BR')} às {new Date(consulta.data_criacao).toLocaleTimeString('pt-BR')}
-                                </Typography>
-                            </Box>
-                        </AccordionSummary>
-                        <AccordionDetails>
-                            <Box>
-                                {consulta.audio_file && (
-                                    <Box sx={{ mb: 2 }}>
-                                        <Typography variant="h6" gutterBottom>Áudio Original:</Typography>
-                                        <audio controls style={{ width: '100%' }}>
-                                            <source src={consulta.audio_file} type="audio/mpeg" />
-                                            Seu navegador não suporta o elemento de áudio.
-                                        </audio>
+            {/* Tab: Consultas */}
+            {tabValue === 0 && (
+                <>
+                    <Typography variant="h5" component="h2" gutterBottom>Histórico de Consultas</Typography>
+
+                    {consultations.length > 0 ? (
+                        consultations.map((consulta) => (
+                            <Accordion key={consulta.id}>
+                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', width: '100%' }}>
+                                        <Typography sx={{ flexGrow: 1 }}>
+                                            Consulta de {new Date(consulta.data_criacao).toLocaleDateString('pt-BR')} às {new Date(consulta.data_criacao).toLocaleTimeString('pt-BR')}
+                                        </Typography>
                                     </Box>
-                                )}
-                                <Typography variant="h6" gutterBottom>Transcrição:</Typography>
-                                <Paper variant="outlined" sx={{ p: 2, mb: 2, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto' }}>
-                                    {consulta.transcricao || "Transcrição pendente ou não disponível."}
-                                </Paper>
-                                <Box sx={{ mt: 3 }}>
-                                <Typography variant="h6" gutterBottom>Ações</Typography>
-                                <Button 
-                                    variant="contained" 
-                                    startIcon={<PsychologyIcon />}
-                                    onClick={() => handleOpenAnalysisDialog(consulta)}
-                                    disabled={!consulta.transcricao}
-                                    sx={{ mr: 1 }}
-                                >
-                                    Analisar com IA
-                                </Button>
-                                <IconButton 
-                                    aria-label="delete" 
-                                    color="error"
-                                    onClick={() => handleDelete(consulta.id)}
-                                >
-                                    <DeleteIcon />
-                                </IconButton>
-                            </Box>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                    <Box>
+                                        {consulta.audio_file && (
+                                            <Box sx={{ mb: 2 }}>
+                                                <Typography variant="h6" gutterBottom>Áudio Original:</Typography>
+                                                <audio controls style={{ width: '100%' }}>
+                                                    <source src={consulta.audio_file} type="audio/mpeg" />
+                                                    Seu navegador não suporta o elemento de áudio.
+                                                </audio>
+                                            </Box>
+                                        )}
+                                        <Typography variant="h6" gutterBottom>Transcrição:</Typography>
+                                        <Paper variant="outlined" sx={{ p: 2, mb: 2, whiteSpace: 'pre-wrap', maxHeight: '300px', overflowY: 'auto' }}>
+                                            {consulta.transcricao || "Transcrição pendente ou não disponível."}
+                                        </Paper>
+                                        <Box sx={{ mt: 3 }}>
+                                        <Typography variant="h6" gutterBottom>Ações</Typography>
+                                        <Button 
+                                            variant="contained" 
+                                            startIcon={<PsychologyIcon />}
+                                            onClick={() => handleOpenAnalysisDialog(consulta)}
+                                            disabled={!consulta.transcricao}
+                                            sx={{ mr: 1 }}
+                                        >
+                                            Analisar com IA
+                                        </Button>
+                                        <IconButton 
+                                            aria-label="delete" 
+                                            color="error"
+                                            onClick={() => handleDelete(consulta.id)}
+                                        >
+                                            <DeleteIcon />
+                                        </IconButton>
+                                    </Box>
 
-                            <Box sx={{ mt: 3 }}>
-                                <Typography variant="h6" gutterBottom>Análises de IA</Typography>
-                                    {consulta.analises && consulta.analises.length > 0 ? (
-                                        consulta.analises.map(analise => (
-                                            <Paper key={analise.id} variant="outlined" sx={{ p: 2, mt: 2, position: 'relative' }}>
-                                                <IconButton 
-                                                    aria-label="delete analysis"
-                                                    color="error"
-                                                    size="small"
-                                                    onClick={() => handleDeleteAnalysis(analise.id)}
-                                                    sx={{ position: 'absolute', top: 8, right: 8 }}
-                                                >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Contexto:</Typography>
-                                                <Typography variant="body2" sx={{ mb: 2 }}>{analise.contexto}</Typography>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Resultado:</Typography>
-                                                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{analise.resultado}</Typography>
-                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
-                                                    Analisado em: {new Date(analise.data_criacao).toLocaleString('pt-BR')}
-                                                </Typography>
-                                            </Paper>
-                                        ))
-                                    ) : (
-                                        <Typography variant="body2" color="text.secondary">Nenhuma análise foi realizada para esta consulta.</Typography>
-                                    )}
-                                </Box>
-                            </Box>
-                        </AccordionDetails>
-                    </Accordion>
-                ))
-            ) : (
-                <Typography>Nenhuma consulta registrada para este cliente.</Typography>
+                                    <Box sx={{ mt: 3 }}>
+                                        <Typography variant="h6" gutterBottom>Análises de IA</Typography>
+                                            {consulta.analises && consulta.analises.length > 0 ? (
+                                                consulta.analises.map(analise => (
+                                                    <Paper key={analise.id} variant="outlined" sx={{ p: 2, mt: 2, position: 'relative' }}>
+                                                        <IconButton 
+                                                            aria-label="delete analysis"
+                                                            color="error"
+                                                            size="small"
+                                                            onClick={() => handleDeleteAnalysis(analise.id)}
+                                                            sx={{ position: 'absolute', top: 8, right: 8 }}
+                                                        >
+                                                            <DeleteIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Contexto:</Typography>
+                                                        <Typography variant="body2" sx={{ mb: 2 }}>{analise.contexto}</Typography>
+                                                        <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Resultado:</Typography>
+                                                        <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>{analise.resultado}</Typography>
+                                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                                                            Analisado em: {new Date(analise.data_criacao).toLocaleString('pt-BR')}
+                                                        </Typography>
+                                                    </Paper>
+                                                ))
+                                            ) : (
+                                                <Typography variant="body2" color="text.secondary">Nenhuma análise foi realizada para esta consulta.</Typography>
+                                            )}
+                                        </Box>
+                                    </Box>
+                                </AccordionDetails>
+                            </Accordion>
+                        ))
+                    ) : (
+                        <Typography>Nenhuma consulta registrada para este cliente.</Typography>
+                    )}
+                </>
+            )}
+
+            {/* Tab: Documentos */}
+            {tabValue === 1 && (
+                <ClientDocuments clienteId={clientId} />
             )}
 
             {/* Diálogo para Análise de IA */}

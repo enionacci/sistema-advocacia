@@ -209,6 +209,52 @@ class PermissionsRegistry:
         ),
     ]
     
+    # ==================== DOCUMENTOS ====================
+    DOCUMENTOS = [
+        PermissionDefinition(
+            codename='ver_documento',
+            nome='Ver Documento',
+            categoria='Documentos',
+            descricao='Permite visualizar documentos'
+        ),
+        PermissionDefinition(
+            codename='criar_documento',
+            nome='Criar Documento',
+            categoria='Documentos',
+            descricao='Permite fazer upload de novos documentos'
+        ),
+        PermissionDefinition(
+            codename='editar_documento',
+            nome='Editar Documento',
+            categoria='Documentos',
+            descricao='Permite editar metadados de documentos existentes'
+        ),
+        PermissionDefinition(
+            codename='deletar_documento',
+            nome='Deletar Documento',
+            categoria='Documentos',
+            descricao='Permite remover documentos do sistema'
+        ),
+        PermissionDefinition(
+            codename='download_documento',
+            nome='Download de Documento',
+            categoria='Documentos',
+            descricao='Permite fazer download de documentos'
+        ),
+        PermissionDefinition(
+            codename='gerenciar_categorias',
+            nome='Gerenciar Categorias',
+            categoria='Documentos',
+            descricao='Permite criar, editar e deletar categorias de documentos'
+        ),
+        PermissionDefinition(
+            codename='gerenciar_tags',
+            nome='Gerenciar Tags',
+            categoria='Documentos',
+            descricao='Permite criar, editar e deletar tags de documentos'
+        ),
+    ]
+    
     @classmethod
     def get_all_permissions(cls) -> List[PermissionDefinition]:
         """Retorna todas as permissões do sistema."""
@@ -218,7 +264,8 @@ class PermissionsRegistry:
             cls.ANALISES +
             cls.GERENCIAMENTO +
             cls.FINANCEIRO +
-            cls.PROCESSOS
+            cls.PROCESSOS +
+            cls.DOCUMENTOS
         )
     
     @classmethod
@@ -231,6 +278,7 @@ class PermissionsRegistry:
             'Gerenciamento': cls.GERENCIAMENTO,
             'Financeiro': cls.FINANCEIRO,
             'Processos': cls.PROCESSOS,
+            'Documentos': cls.DOCUMENTOS,
         }
     
     @classmethod
@@ -309,17 +357,20 @@ class PermissionsRegistry:
                 'ver_consulta', 'criar_consulta', 'editar_consulta',
                 'ver_analise', 'criar_analise', 'editar_analise',
                 'ver_processo', 'criar_processo', 'editar_processo',
+                'ver_documento', 'criar_documento', 'editar_documento', 'deletar_documento', 'download_documento',
                 'ver_relatorios',
             ],
             'Secretária': [
                 'ver_cliente', 'criar_cliente', 'editar_cliente',
                 'ver_consulta', 'criar_consulta',
                 'ver_processo', 'criar_processo',
+                'ver_documento', 'criar_documento', 'editar_documento', 'download_documento',
             ],
             'Assistente': [
                 'ver_cliente',
                 'ver_consulta',
                 'ver_processo',
+                'ver_documento', 'download_documento',
             ],
             'Financeiro': [
                 'ver_cliente',

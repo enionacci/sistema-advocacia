@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'consultas',
     'analises',
     'escritorios',
+    'documentos',  # Nova app
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -67,7 +68,7 @@ MIDDLEWARE = [
     'escritorios.audit_middleware.AuditMiddleware',  # Middleware de auditoria (antes do SubscriptionCheck)
     'escritorios.middleware.SubscriptionCheckMiddleware', # Nosso middleware de verificação
     'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    # 'django.middleware.clickjacking.XFrameOptionsMiddleware',  # DESABILITADO para permitir iframes
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -149,6 +150,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000", # Endereço do nosso frontend React
 ]
+
+# Permitir iframes do frontend (para visualizador de documentos)
+# SAMEORIGIN só funciona se for mesma origem. Como frontend está em localhost:3000
+# e backend em 127.0.0.1:8000, precisamos desabilitar ou usar ALLOW-FROM
+# Para desenvolvimento, vamos desabilitar a proteção X-Frame-Options
+X_FRAME_OPTIONS = None  # Desabilita proteção (apenas desenvolvimento!)
+# Em produção, use uma solução mais segura
+
+# Permitir credenciais CORS
+CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

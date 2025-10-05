@@ -40,6 +40,10 @@ class AuditMiddleware(MiddlewareMixin):
         r'^/static/',
         r'^/media/',
         r'^/api/audit-logs/',  # Não audita consultas de auditoria
+        r'.*/incrementar_visualizacao/$',  # Não audita incremento de visualizações
+        r'.*/incrementar-visualizacao/$',  # Não audita incremento de visualizações (hífen)
+        r'.*/download/$',  # Download já incrementa contador próprio
+        r'.*/estatisticas/$',  # Não audita consultas de estatísticas
     ]
     
     # Mapeamento de método HTTP para ação
@@ -170,6 +174,9 @@ class AuditMiddleware(MiddlewareMixin):
                     'consulta': 'consultas.Consulta',
                     'analise': 'analises.AnaliseIA',
                     'papel': 'escritorios.Papel',
+                    'documento': 'documentos.Documento',
+                    'categoria': 'documentos.Categoria',
+                    'tag': 'documentos.Tag',
                 }
                 
                 model_path = model_mapping.get(model_name)
