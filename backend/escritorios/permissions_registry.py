@@ -145,6 +145,12 @@ class PermissionsRegistry:
             categoria='Gerenciamento',
             descricao='Permite visualizar relatórios e estatísticas'
         ),
+        PermissionDefinition(
+            codename='ver_auditoria',
+            nome='Ver Auditoria',
+            categoria='Gerenciamento',
+            descricao='Permite visualizar logs de auditoria do sistema (restrito a administradores)'
+        ),
     ]
     
     # ==================== FINANCEIRO ====================

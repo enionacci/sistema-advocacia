@@ -11,6 +11,7 @@ distro==1.9.0
 Django==5.2.6
 django-cors-headers==4.9.0
 django-fernet-encrypted-fields==0.3.0
+django-filter==24.5.0
 djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 djoser==2.3.3

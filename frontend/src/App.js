@@ -17,6 +17,9 @@ import EscritorioPage from './pages/EscritorioPage';
 import RegisterPage from './pages/RegisterPage'; // Importa a nova página
 import CreateOfficePage from './pages/CreateOfficePage';
 import AcceptInvitationPage from './pages/AcceptInvitationPage';
+import AuditLogListPage from './pages/AuditLogListPage';
+import AuditLogDetailPage from './pages/AuditLogDetailPage';
+import AuditLogStatsPage from './pages/AuditLogStatsPage';
 
 function App() {
   const { user, logoutAction, escritorio } = useAuth();
@@ -113,6 +116,32 @@ function App() {
               <AuthenticatedRoute>
                 <CreateOfficePage />
               </AuthenticatedRoute>
+            } 
+          />
+
+          {/* Rotas de Auditoria */}
+          <Route 
+            path="/audit-logs" 
+            element={
+              <PrivateRoute>
+                <AuditLogListPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/audit-logs/stats" 
+            element={
+              <PrivateRoute>
+                <AuditLogStatsPage />
+              </PrivateRoute>
+            } 
+          />
+          <Route 
+            path="/audit-logs/:id" 
+            element={
+              <PrivateRoute>
+                <AuditLogDetailPage />
+              </PrivateRoute>
             } 
           />
 

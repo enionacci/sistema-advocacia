@@ -98,3 +98,7 @@ class Convite(models.Model):
 
     def __str__(self):
         return f"Convite para {self.email} para o escritório {self.escritorio.nome}"
+
+
+# Importa models de auditoria
+from .audit_models import AuditLog, AuditLogRetencao

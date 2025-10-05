@@ -11,6 +11,7 @@ urlpatterns = [
     path('api/', include('consultas.urls')),
     path('api/', include('analises.urls')),
     path('api/', include('escritorios.urls')),
+    path('api/audit-logs/', include('escritorios.audit_urls')),  # URLs de auditoria
 
     # URLs de Autenticação geradas pelo Djoser
     path('api/auth/', include('djoser.urls')),

@@ -64,6 +64,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'escritorios.audit_middleware.AuditMiddleware',  # Middleware de auditoria (antes do SubscriptionCheck)
     'escritorios.middleware.SubscriptionCheckMiddleware', # Nosso middleware de verificação
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

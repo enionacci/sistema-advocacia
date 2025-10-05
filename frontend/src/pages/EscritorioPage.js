@@ -10,6 +10,7 @@ import AccountCircleIcon from '@mui/icons-material/AccountCircle';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import AssessmentIcon from '@mui/icons-material/Assessment';
 import { useAuth } from '../context/AuthContext';
 import PapelDialog from '../components/PapelDialog';
 import UserRolesDialog from '../components/UserRolesDialog';
@@ -302,8 +303,21 @@ function EscritorioPage() {
                         {isEditing ? 'Salvando...' : 'Salvar Alterações'}
                     </Button>
 
-                    <Button variant="outlined" onClick={() => setShowPapeis(!showPapeis)} sx={{ mt: 2, ml: 2 }}>
+                    <Button 
+                        variant="outlined" 
+                        onClick={() => setShowPapeis(!showPapeis)} 
+                        sx={{ mt: 2, ml: 2 }}
+                    >
                         {showPapeis ? 'Ocultar Gerenciamento de Papéis' : 'Gerenciar Papéis'}
+                    </Button>
+
+                    <Button 
+                        variant="outlined" 
+                        startIcon={<AssessmentIcon />}
+                        onClick={() => navigate('/audit-logs')} 
+                        sx={{ mt: 2, ml: 2 }}
+                    >
+                        Auditoria
                     </Button>
                 </Box>
             </Paper>
