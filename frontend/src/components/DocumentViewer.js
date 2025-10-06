@@ -10,12 +10,18 @@ import {
   IconButton,
   Alert,
   CircularProgress,
+  Tabs,
+  Tab,
+  Paper,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Download as DownloadIcon,
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
+  Description as DescriptionIcon,
+  Image as ImageIcon,
+  ContentCopy as ContentCopyIcon,
 } from '@mui/icons-material';
 
 /**
@@ -38,6 +44,7 @@ const DocumentViewer = ({
   const [zoom, setZoom] = React.useState(100);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
+  const [activeTab, setActiveTab] = React.useState(0);
   const hasIncremented = useRef(false);
 
   // Incrementa visualizações quando abre
@@ -47,9 +54,17 @@ const DocumentViewer = ({
       setError('');
       setZoom(100);
       
+      // Abre na aba correta: 
+      // - Se NÃO tem arquivo_url, abre direto no texto extraído (aba 1)
+      // - Se tem arquivo_url, abre no arquivo (aba 0)
+      const hasTextoExtraido = documento.texto_extraido && documento.texto_extraido.trim().length > 0;
+      const hasArquivo = documento.arquivo_url && documento.arquivo_url.trim().length > 0;
+      setActiveTab(hasArquivo ? 0 : (hasTextoExtraido ? 1 : 0));
+      
       // Debug: Log da URL do arquivo
       console.log('DocumentViewer - Documento:', documento);
       console.log('DocumentViewer - arquivo_url:', documento.arquivo_url);
+      console.log('DocumentViewer - Abrindo na aba:', hasArquivo ? 'Arquivo' : 'Texto Extraído');
       
       // Incrementa contador após um pequeno delay (garante que abriu)
       const timer = setTimeout(() => {
@@ -102,6 +117,15 @@ const DocumentViewer = ({
     setError('Erro ao carregar o documento. Tente fazer o download.');
   };
 
+  const handleCopyText = () => {
+    if (documento.texto_extraido) {
+      navigator.clipboard.writeText(documento.texto_extraido);
+      // Poderia adicionar um snackbar aqui
+    }
+  };
+
+  const hasTextoExtraido = documento && documento.texto_extraido && documento.texto_extraido.trim().length > 0;
+
   return (
     <Dialog
       open={open}
@@ -146,110 +170,164 @@ const DocumentViewer = ({
       </DialogTitle>
 
       <DialogContent dividers sx={{ p: 0, position: 'relative' }}>
-        {loading && (
-          <Box
-            sx={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              zIndex: 10,
-            }}
+        {/* Tabs para alternar entre visualização do arquivo e texto OCR */}
+        {hasTextoExtraido && (
+          <Tabs 
+            value={activeTab} 
+            onChange={(e, newValue) => setActiveTab(newValue)}
+            sx={{ borderBottom: 1, borderColor: 'divider', px: 2, bgcolor: 'background.paper' }}
           >
-            <CircularProgress />
-          </Box>
+            <Tab icon={<ImageIcon />} label="Arquivo" />
+            <Tab icon={<DescriptionIcon />} label="Texto Extraído (OCR)" />
+          </Tabs>
         )}
 
-        {error && (
-          <Box sx={{ p: 3 }}>
-            <Alert severity="error">{error}</Alert>
-          </Box>
-        )}
-
-        {!isViewable && !error && (
-          <Box sx={{ p: 3 }}>
-            <Alert severity="info">
-              <Typography variant="h6" gutterBottom>
-                Pré-visualização não disponível
-              </Typography>
-              <Typography variant="body2">
-                Este tipo de arquivo ({documento.tipo_arquivo?.toUpperCase()}) não pode ser visualizado diretamente no navegador.
-              </Typography>
-              <Typography variant="body2" sx={{ mt: 1 }}>
-                Por favor, faça o download do arquivo para visualizá-lo.
-              </Typography>
-              <Button
-                variant="contained"
-                startIcon={<DownloadIcon />}
-                onClick={handleDownload}
-                sx={{ mt: 2 }}
-              >
-                Fazer Download
-              </Button>
-            </Alert>
-          </Box>
-        )}
-
-        {isViewable && !error && (
-          <Box sx={{ 
-            height: '100%', 
-            width: '100%',
-            display: 'flex',
-            justifyContent: 'center',
-            alignItems: 'center',
-            bgcolor: '#f5f5f5',
-            overflow: 'auto',
-          }}>
-            {isPDF && (
-              <object
-                data={documento.arquivo_url}
-                type="application/pdf"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  border: 'none',
-                }}
-                title={documento.titulo}
-                onLoad={handleLoadSuccess}
-                onError={handleLoadError}
-              >
-                <embed
-                  src={documento.arquivo_url}
-                  type="application/pdf"
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    border: 'none',
-                  }}
-                />
-              </object>
-            )}
-
-            {isImage && (
+        {/* Conteúdo da aba Arquivo */}
+        {activeTab === 0 && (
+          <>
+            {loading && (
               <Box
                 sx={{
-                  width: '100%',
-                  height: '100%',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  p: 2,
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                  zIndex: 10,
                 }}
               >
-                <img
-                  src={documento.arquivo_url}
-                  alt={documento.titulo}
-                  style={{
-                    maxWidth: `${zoom}%`,
-                    maxHeight: `${zoom}%`,
-                    objectFit: 'contain',
-                    transition: 'all 0.3s ease',
-                  }}
-                  onLoad={handleLoadSuccess}
-                  onError={handleLoadError}
-                />
+                <CircularProgress />
               </Box>
             )}
+
+            {error && (
+              <Box sx={{ p: 3 }}>
+                <Alert severity="error">{error}</Alert>
+              </Box>
+            )}
+
+            {!isViewable && !error && (
+              <Box sx={{ p: 3 }}>
+                <Alert severity="info">
+                  <Typography variant="h6" gutterBottom>
+                    Pré-visualização não disponível
+                  </Typography>
+                  <Typography variant="body2">
+                    Este tipo de arquivo ({documento.tipo_arquivo?.toUpperCase()}) não pode ser visualizado diretamente no navegador.
+                  </Typography>
+                  <Typography variant="body2" sx={{ mt: 1 }}>
+                    Por favor, faça o download do arquivo para visualizá-lo.
+                  </Typography>
+                  <Button
+                    variant="contained"
+                    startIcon={<DownloadIcon />}
+                    onClick={handleDownload}
+                    sx={{ mt: 2 }}
+                  >
+                    Fazer Download
+                  </Button>
+                </Alert>
+              </Box>
+            )}
+
+            {isViewable && !error && (
+              <Box sx={{ 
+                height: '100%', 
+                width: '100%',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                bgcolor: '#f5f5f5',
+                overflow: 'auto',
+              }}>
+                {isPDF && (
+                  <object
+                    data={documento.arquivo_url}
+                    type="application/pdf"
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      border: 'none',
+                    }}
+                    title={documento.titulo}
+                    onLoad={handleLoadSuccess}
+                    onError={handleLoadError}
+                  >
+                    <embed
+                      src={documento.arquivo_url}
+                      type="application/pdf"
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        border: 'none',
+                      }}
+                    />
+                  </object>
+                )}
+
+                {isImage && (
+                  <Box
+                    sx={{
+                      width: '100%',
+                      height: '100%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                      p: 2,
+                    }}
+                  >
+                    <img
+                      src={documento.arquivo_url}
+                      alt={documento.titulo}
+                      style={{
+                        maxWidth: `${zoom}%`,
+                        maxHeight: `${zoom}%`,
+                        objectFit: 'contain',
+                        transition: 'all 0.3s ease',
+                      }}
+                      onLoad={handleLoadSuccess}
+                      onError={handleLoadError}
+                    />
+                  </Box>
+                )}
+              </Box>
+            )}
+          </>
+        )}
+
+        {/* Conteúdo da aba Texto OCR */}
+        {activeTab === 1 && hasTextoExtraido && (
+          <Box sx={{ p: 3, height: '100%', overflow: 'auto' }}>
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                p: 3, 
+                bgcolor: 'grey.50',
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 1,
+                fontFamily: 'monospace',
+                whiteSpace: 'pre-wrap',
+                wordBreak: 'break-word',
+                minHeight: '400px',
+              }}
+            >
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Texto extraído por OCR ({documento.texto_extraido.length} caracteres)
+                </Typography>
+                <Button
+                  size="small"
+                  startIcon={<ContentCopyIcon />}
+                  onClick={handleCopyText}
+                  variant="outlined"
+                >
+                  Copiar
+                </Button>
+              </Box>
+              <Typography variant="body2" component="pre" sx={{ fontFamily: 'inherit', margin: 0 }}>
+                {documento.texto_extraido}
+              </Typography>
+            </Paper>
           </Box>
         )}
       </DialogContent>

@@ -3,6 +3,14 @@ from rest_framework import serializers
 from django.contrib.auth.models import User
 from .models import Escritorio, PerfilUsuario, Convite, Papel, Permissao
 
+
+class PermissaoSerializer(serializers.ModelSerializer):
+    """Serializer para Permissões"""
+    class Meta:
+        model = Permissao
+        fields = ['id', 'nome', 'codename']
+
+
 class ConviteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Convite
@@ -33,9 +41,42 @@ class PerfilUsuarioSerializer(serializers.ModelSerializer):
     """Serializer para o Perfil do Usuário, incluindo dados do usuário."""
     user = UserSerializerForPerfil(read_only=True)
     papeis = serializers.StringRelatedField(many=True, read_only=True)
+    papel_principal = serializers.SerializerMethodField()
+    permissoes = serializers.SerializerMethodField()
+    
     class Meta:
         model = PerfilUsuario
-        fields = ['id', 'user', 'papeis']
+        fields = ['id', 'user', 'papeis', 'papel_principal', 'permissoes']
+    
+    def get_papel_principal(self, obj):
+        """Retorna o nome do primeiro papel (papel principal)"""
+        primeiro_papel = obj.papeis.first()
+        return primeiro_papel.nome if primeiro_papel else None
+    
+    def get_permissoes(self, obj):
+        """Retorna todas as permissões do usuário (de todos os papéis)"""
+        # Coleta todas as permissões de todos os papéis
+        permissoes_set = set()
+        for papel in obj.papeis.all():
+            for permissao in papel.permissoes.all():
+                permissoes_set.add(permissao)
+        
+        # Serializa as permissões únicas
+        return PermissaoSerializer(permissoes_set, many=True).data
+
+
+class UserWithProfileSerializer(serializers.ModelSerializer):
+    """
+    Serializer customizado para o endpoint /users/me/ do Djoser
+    Inclui o perfil com permissões
+    """
+    perfil = PerfilUsuarioSerializer(read_only=True)
+    
+    class Meta:
+        model = User
+        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'is_superuser', 'perfil']
+        read_only_fields = ['id', 'is_superuser']
+
 
 class PermissaoSerializer(serializers.ModelSerializer):
     class Meta:
@@ -62,6 +103,8 @@ class EscritorioSerializer(serializers.ModelSerializer):
     membros = PerfilUsuarioSerializer(many=True, read_only=True)
     # Campo para receber a chave de API, mas nunca enviá-la de volta.
     openai_api_key = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    # Campo logo com URL completa
+    logo = serializers.SerializerMethodField()
 
     class Meta:
         model = Escritorio
@@ -71,3 +114,12 @@ class EscritorioSerializer(serializers.ModelSerializer):
             'logo'
         ]
         read_only_fields = ['data_criacao', 'membros']
+
+    def get_logo(self, obj):
+        """Retorna a URL completa do logo se existir."""
+        if obj.logo:
+            request = self.context.get('request')
+            if request is not None:
+                return request.build_absolute_uri(obj.logo.url)
+            return obj.logo.url
+        return None

@@ -138,7 +138,9 @@ class Documento(models.Model):
         Cliente,
         on_delete=models.CASCADE,
         related_name='documentos',
-        verbose_name='Cliente'
+        verbose_name='Cliente',
+        null=True,
+        blank=True
     )
     categoria = models.ForeignKey(
         Categoria,
@@ -163,7 +165,9 @@ class Documento(models.Model):
                 allowed_extensions=['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png', 'txt', 'xlsx', 'xls']
             )
         ],
-        verbose_name='Arquivo'
+        verbose_name='Arquivo',
+        null=True,
+        blank=True
     )
     titulo = models.CharField(
         max_length=255,
@@ -314,3 +318,125 @@ class Documento(models.Model):
         """
         self.downloads += 1
         self.save(update_fields=['downloads'])
+
+
+class DocumentoAnaliseIA(models.Model):
+    """
+    Armazena análises de documentos realizadas por IA (GPT)
+    Após OCR, o texto pode ser analisado por IA para diferentes propósitos
+    """
+    
+    TIPO_ANALISE_CHOICES = [
+        ('resumo', 'Resumo Executivo'),
+        ('extracao_dados', 'Extração de Dados'),
+        ('juridico', 'Análise Jurídica'),
+        ('contrato', 'Análise de Contrato'),
+        ('risco', 'Análise de Risco'),
+        ('personalizado', 'Análise Personalizada'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('processando', 'Processando'),
+        ('concluido', 'Concluído'),
+        ('erro', 'Erro'),
+    ]
+    
+    escritorio = models.ForeignKey(
+        Escritorio,
+        on_delete=models.CASCADE,
+        related_name='analises_ia',
+        verbose_name='Escritório'
+    )
+    documento = models.ForeignKey(
+        Documento,
+        on_delete=models.CASCADE,
+        related_name='analises_ia',
+        verbose_name='Documento'
+    )
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='analises_solicitadas',
+        verbose_name='Usuário que solicitou'
+    )
+    tipo_analise = models.CharField(
+        max_length=20,
+        choices=TIPO_ANALISE_CHOICES,
+        verbose_name='Tipo de Análise'
+    )
+    prompt_personalizado = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name='Prompt Personalizado',
+        help_text='Instruções específicas para a IA (apenas para análise personalizada)'
+    )
+    status = models.CharField(
+        max_length=15,
+        choices=STATUS_CHOICES,
+        default='pendente',
+        verbose_name='Status'
+    )
+    
+    # Resultado da análise
+    resultado = models.TextField(
+        blank=True,
+        verbose_name='Resultado da Análise'
+    )
+    dados_estruturados = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name='Dados Estruturados',
+        help_text='Dados extraídos em formato JSON (para extração de dados)'
+    )
+    
+    # Metadados
+    data_solicitacao = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Data da Solicitação'
+    )
+    data_conclusao = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Data da Conclusão'
+    )
+    tempo_processamento = models.DurationField(
+        null=True,
+        blank=True,
+        verbose_name='Tempo de Processamento'
+    )
+    mensagem_erro = models.TextField(
+        blank=True,
+        verbose_name='Mensagem de Erro'
+    )
+    
+    # Custo e tokens (OpenAI)
+    tokens_usados = models.IntegerField(
+        default=0,
+        verbose_name='Tokens Utilizados'
+    )
+    custo_estimado = models.DecimalField(
+        max_digits=10,
+        decimal_places=4,
+        default=0,
+        verbose_name='Custo Estimado (USD)'
+    )
+    modelo_ia = models.CharField(
+        max_length=50,
+        default='gpt-4',
+        verbose_name='Modelo de IA Utilizado'
+    )
+    
+    class Meta:
+        verbose_name = 'Análise de IA'
+        verbose_name_plural = 'Análises de IA'
+        ordering = ['-data_solicitacao']
+        indexes = [
+            models.Index(fields=['escritorio', '-data_solicitacao']),
+            models.Index(fields=['documento', '-data_solicitacao']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"{self.get_tipo_analise_display()} - {self.documento.titulo} ({self.status})"

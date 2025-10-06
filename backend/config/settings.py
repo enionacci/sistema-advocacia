@@ -151,6 +151,12 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000", # Endereço do nosso frontend React
 ]
 
+# Origens confiáveis para CSRF
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 # Permitir iframes do frontend (para visualizador de documentos)
 # SAMEORIGIN só funciona se for mesma origem. Como frontend está em localhost:3000
 # e backend em 127.0.0.1:8000, precisamos desabilitar ou usar ALLOW-FROM
@@ -166,8 +172,18 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication', 
     ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 10,
+}
+
+# Configuração do Djoser (Autenticação)
+DJOSER = {
+    'SERIALIZERS': {
+        'current_user': 'escritorios.serializers.UserWithProfileSerializer',
+    },
 }
 
 # config/settings.py

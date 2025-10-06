@@ -255,6 +255,40 @@ class PermissionsRegistry:
         ),
     ]
     
+    # ==================== SCANNER & IA ====================
+    SCANNER_IA = [
+        PermissionDefinition(
+            codename='escanear_documento',
+            nome='Escanear Documento',
+            categoria='Scanner & IA',
+            descricao='Permite fazer upload de documentos escaneados para OCR'
+        ),
+        PermissionDefinition(
+            codename='solicitar_analise_ia',
+            nome='Solicitar Análise IA',
+            categoria='Scanner & IA',
+            descricao='Permite solicitar análise de documentos por IA (GPT)'
+        ),
+        PermissionDefinition(
+            codename='ver_analise_ia',
+            nome='Ver Análise IA',
+            categoria='Scanner & IA',
+            descricao='Permite visualizar análises de IA realizadas'
+        ),
+        PermissionDefinition(
+            codename='editar_analise_ia',
+            nome='Editar Análise IA',
+            categoria='Scanner & IA',
+            descricao='Permite editar e corrigir análises de IA'
+        ),
+        PermissionDefinition(
+            codename='deletar_analise_ia',
+            nome='Deletar Análise IA',
+            categoria='Scanner & IA',
+            descricao='Permite remover análises de IA do sistema'
+        ),
+    ]
+    
     @classmethod
     def get_all_permissions(cls) -> List[PermissionDefinition]:
         """Retorna todas as permissões do sistema."""
@@ -265,7 +299,8 @@ class PermissionsRegistry:
             cls.GERENCIAMENTO +
             cls.FINANCEIRO +
             cls.PROCESSOS +
-            cls.DOCUMENTOS
+            cls.DOCUMENTOS +
+            cls.SCANNER_IA
         )
     
     @classmethod

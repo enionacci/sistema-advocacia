@@ -21,7 +21,7 @@ function getCookie(name) {
 
 const axiosInstance = axios.create({
     baseURL: baseURL,
-    timeout: 5000,
+    timeout: 120000, // 2 minutos para operações de OCR
     headers: {
         'Content-Type': 'application/json',
         'accept': 'application/json'

@@ -3,7 +3,7 @@ Serializers para API de Documentos
 """
 
 from rest_framework import serializers
-from .models import Categoria, Tag, Documento
+from .models import Categoria, Tag, Documento, DocumentoAnaliseIA
 from django.contrib.auth import get_user_model
 
 User = get_user_model()
@@ -77,7 +77,7 @@ class DocumentoListSerializer(serializers.ModelSerializer):
             'categoria', 'categoria_nome', 'categoria_icone', 'categoria_cor',
             'cliente', 'cliente_nome', 'tags_list', 'confidencial',
             'versao', 'visualizacoes', 'downloads', 'usuario_nome',
-            'arquivo_url', 'ativo'
+            'arquivo_url', 'ativo', 'texto_extraido'
         ]
 
     def get_usuario_nome(self, obj):
@@ -203,7 +203,7 @@ class DocumentoUpdateSerializer(serializers.ModelSerializer):
         model = Documento
         fields = [
             'titulo', 'descricao', 'categoria', 'data_documento',
-            'confidencial', 'ativo', 'tags_ids'
+            'confidencial', 'ativo', 'tags_ids', 'texto_extraido'
         ]
 
     def update(self, instance, validated_data):
@@ -227,3 +227,95 @@ class DocumentoUpdateSerializer(serializers.ModelSerializer):
             instance.tags.set(tags)
         
         return instance
+
+
+class DocumentoAnaliseIAListSerializer(serializers.ModelSerializer):
+    """
+    Serializer simplificado para listagem de análises de IA
+    """
+    documento_titulo = serializers.CharField(source='documento.titulo', read_only=True)
+    usuario_nome = serializers.SerializerMethodField()
+    tipo_analise_display = serializers.CharField(source='get_tipo_analise_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = DocumentoAnaliseIA
+        fields = [
+            'id', 'documento', 'documento_titulo', 'tipo_analise',
+            'tipo_analise_display', 'status', 'status_display',
+            'data_solicitacao', 'data_conclusao', 'tempo_processamento',
+            'usuario_nome', 'tokens_usados', 'custo_estimado', 'modelo_ia'
+        ]
+    
+    def get_usuario_nome(self, obj):
+        """Retorna o nome do usuário que solicitou"""
+        if obj.usuario:
+            return obj.usuario.email or obj.usuario.username
+        return 'Sistema'
+
+
+class DocumentoAnaliseIADetailSerializer(serializers.ModelSerializer):
+    """
+    Serializer completo para detalhes da análise de IA
+    """
+    documento_dados = DocumentoListSerializer(source='documento', read_only=True)
+    usuario_nome = serializers.SerializerMethodField()
+    tipo_analise_display = serializers.CharField(source='get_tipo_analise_display', read_only=True)
+    status_display = serializers.CharField(source='get_status_display', read_only=True)
+    
+    class Meta:
+        model = DocumentoAnaliseIA
+        fields = [
+            'id', 'documento', 'documento_dados', 'usuario', 'usuario_nome',
+            'tipo_analise', 'tipo_analise_display', 'prompt_personalizado',
+            'status', 'status_display', 'resultado', 'dados_estruturados',
+            'data_solicitacao', 'data_conclusao', 'tempo_processamento',
+            'mensagem_erro', 'tokens_usados', 'custo_estimado', 'modelo_ia'
+        ]
+        read_only_fields = [
+            'data_solicitacao', 'data_conclusao', 'tempo_processamento',
+            'mensagem_erro', 'tokens_usados', 'custo_estimado'
+        ]
+    
+    def get_usuario_nome(self, obj):
+        """Retorna o nome do usuário que solicitou"""
+        if obj.usuario:
+            return obj.usuario.email or obj.usuario.username
+        return 'Sistema'
+
+
+class DocumentoAnaliseIACreateSerializer(serializers.ModelSerializer):
+    """
+    Serializer para criação de análises de IA
+    """
+    class Meta:
+        model = DocumentoAnaliseIA
+        fields = [
+            'documento', 'tipo_analise', 'prompt_personalizado'
+        ]
+    
+    def validate(self, data):
+        """Validações customizadas"""
+        # Se for análise personalizada, prompt é obrigatório
+        if data.get('tipo_analise') == 'personalizado' and not data.get('prompt_personalizado'):
+            raise serializers.ValidationError({
+                'prompt_personalizado': 'Prompt personalizado é obrigatório para análise personalizada'
+            })
+        
+        return data
+    
+    def create(self, validated_data):
+        """
+        Cria a análise de IA
+        """
+        user = self.context['request'].user
+        
+        # Adiciona escritório e usuário
+        validated_data['escritorio'] = user.perfil.escritorio
+        validated_data['usuario'] = user
+        validated_data['status'] = 'pendente'
+        
+        # Cria a análise
+        analise = DocumentoAnaliseIA.objects.create(**validated_data)
+        
+        return analise

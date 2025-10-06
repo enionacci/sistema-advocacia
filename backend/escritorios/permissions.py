@@ -35,6 +35,10 @@ class HasPermission(BasePermission):
             required_any_permission = ['ver_cliente', 'editar_cliente']  # Requer ALGUMA
     """
     def has_permission(self, request, view):
+        # Superusuário sempre tem permissão
+        if request.user and request.user.is_authenticated and request.user.is_superuser:
+            return True
+            
         if not request.user or not request.user.is_authenticated or not hasattr(request.user, 'perfil'):
             return False
 

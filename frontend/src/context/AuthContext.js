@@ -81,6 +81,23 @@ export const AuthProvider = ({ children }) => {
     await fetchAndSetAuthData(access); // Fetch data after getting tokens
   }, [fetchAndSetAuthData]);
 
+  // Verifica se o usuário tem uma permissão específica
+  const hasPermission = useCallback((permissionCodename) => {
+    if (!user || !user.perfil) return false;
+    
+    // Superusuário tem todas as permissões
+    if (user.is_superuser) return true;
+    
+    // Verifica se a permissão está na lista de permissões do perfil
+    if (user.perfil.permissoes && Array.isArray(user.perfil.permissoes)) {
+      return user.perfil.permissoes.some(
+        perm => perm.codename === permissionCodename
+      );
+    }
+    
+    return false;
+  }, [user]);
+
   useEffect(() => {
     if (tokens) {
       fetchAndSetAuthData(tokens.access);
@@ -98,6 +115,7 @@ export const AuthProvider = ({ children }) => {
     logoutAction,
     loginActionWithTokens,
     refreshAuthData: () => fetchAndSetAuthData(tokens.access), // Expose a refresh function
+    hasPermission, // Nova função para verificar permissões
   };
 
   return (

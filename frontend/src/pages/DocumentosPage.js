@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Paper,
@@ -6,13 +7,8 @@ import {
   Button,
   TextField,
   Grid,
-  Card,
-  CardContent,
-  CardActions,
   Chip,
   IconButton,
-  Menu,
-  MenuItem,
   Dialog,
   DialogTitle,
   DialogContent,
@@ -26,13 +22,20 @@ import {
   Tooltip,
   FormControlLabel,
   Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  MenuItem,
 } from '@mui/material';
 import {
-  Add as AddIcon,
   Search as SearchIcon,
   FilterList as FilterIcon,
   PictureAsPdf,
   Description,
+  Description as DescriptionIcon,
   Image,
   TableChart,
   TextSnippet,
@@ -41,9 +44,9 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Visibility as VisibilityIcon,
-  MoreVert as MoreVertIcon,
-  CloudUpload as CloudUploadIcon,
   Close as CloseIcon,
+  Scanner as ScannerIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
 import {
   listDocumentos,
@@ -60,8 +63,12 @@ import {
   validateFileSize,
 } from '../utils/documentService';
 import DocumentViewer from '../components/DocumentViewer';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const DocumentosPage = () => {
+  const navigate = useNavigate();
+  
   // Estado
   const [documentos, setDocumentos] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -78,26 +85,9 @@ const DocumentosPage = () => {
   const [showFilters, setShowFilters] = useState(false);
   
   // Dialogs
-  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [selectedDoc, setSelectedDoc] = useState(null);
-  
-  // Upload
-  const [uploadFile, setUploadFile] = useState(null);
-  const [uploadData, setUploadData] = useState({
-    titulo: '',
-    descricao: '',
-    categoria: '',
-    tags_ids: [],
-    confidencial: false,
-    data_documento: '',
-  });
-  const [uploadProgress, setUploadProgress] = useState(0);
-  
-  // Menu
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [menuDoc, setMenuDoc] = useState(null);
 
   // Carregar dados
   useEffect(() => {
@@ -118,7 +108,11 @@ const DocumentosPage = () => {
         confidencial: confidencialFilter || undefined,
       };
       const data = await listDocumentos(params);
-      setDocumentos(data.results || data);
+      // Filtrar APENAS documentos com texto_extraido (escaneados por OCR)
+      const documentosEscaneados = (data.results || data).filter(doc => 
+        doc.texto_extraido && doc.texto_extraido.trim().length > 0
+      );
+      setDocumentos(documentosEscaneados);
     } catch (err) {
       setError('Erro ao carregar documentos');
       console.error(err);
@@ -156,81 +150,6 @@ const DocumentosPage = () => {
     setCategoriaFilter('');
     setTagsFilter([]);
     setConfidencialFilter(false);
-  };
-
-  // Upload
-  const handleFileSelect = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    if (!validateFileType(file)) {
-      setError('Tipo de arquivo não permitido');
-      return;
-    }
-
-    if (!validateFileSize(file)) {
-      setError('Arquivo muito grande (máximo 10MB)');
-      return;
-    }
-
-    setUploadFile(file);
-    setUploadData({
-      ...uploadData,
-      titulo: file.name.split('.').slice(0, -1).join('.'),
-    });
-  };
-
-  const handleUpload = async () => {
-    if (!uploadFile) {
-      setError('Selecione um arquivo');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setUploadProgress(0);
-
-    try {
-      const formData = new FormData();
-      formData.append('arquivo', uploadFile);
-      formData.append('titulo', uploadData.titulo || uploadFile.name);
-      if (uploadData.descricao) formData.append('descricao', uploadData.descricao);
-      if (uploadData.categoria) formData.append('categoria', uploadData.categoria);
-      if (uploadData.data_documento) formData.append('data_documento', uploadData.data_documento);
-      formData.append('confidencial', uploadData.confidencial);
-      
-      uploadData.tags_ids.forEach((tagId) => {
-        formData.append('tags_ids', tagId);
-      });
-
-      await uploadDocumento(formData, (progressEvent) => {
-        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        setUploadProgress(progress);
-      });
-
-      setSuccess('Documento enviado com sucesso!');
-      setUploadDialogOpen(false);
-      resetUploadForm();
-      loadDocumentos();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Erro ao fazer upload');
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setUploadProgress(0);
-    }
-  };
-
-  const resetUploadForm = () => {
-    setUploadFile(null);
-    setUploadData({
-      titulo: '',
-      descricao: '',
-      categoria: '',
-      tags_ids: [],
-      confidencial: false,
-      data_documento: '',
-    });
   };
 
   // Editar
@@ -282,7 +201,6 @@ const DocumentosPage = () => {
       console.error(err);
     } finally {
       setLoading(false);
-      handleMenuClose();
     }
   };
 
@@ -295,14 +213,12 @@ const DocumentosPage = () => {
       setError('Erro ao fazer download');
       console.error(err);
     }
-    handleMenuClose();
   };
 
   // Visualizar
   const handleView = (doc) => {
     setSelectedDoc(doc);
     setViewerOpen(true);
-    handleMenuClose();
   };
 
   const handleIncrementView = async (docId) => {
@@ -315,17 +231,6 @@ const DocumentosPage = () => {
     } catch (err) {
       console.error('Erro ao incrementar visualização:', err);
     }
-  };
-
-  // Menu
-  const handleMenuOpen = (event, doc) => {
-    setAnchorEl(event.currentTarget);
-    setMenuDoc(doc);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setMenuDoc(null);
   };
 
   // Ícone do tipo de arquivo
@@ -345,21 +250,38 @@ const DocumentosPage = () => {
     return <Icon />;
   };
 
+  // Navegação
+  const handleNavigate = (path) => {
+    navigate(path);
+  };
+
   return (
     <Box sx={{ p: 3 }}>
-      {/* Cabeçalho */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">Documentos</Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => setUploadDialogOpen(true)}
-        >
-          Novo Documento
-        </Button>
-      </Box>
+      <Paper sx={{ p: 3 }}>
+        {/* Cabeçalho */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <DescriptionIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
+            <Box>
+              <Typography variant="h4" gutterBottom>
+                Documentos Escaneados
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Documentos processados com OCR (Reconhecimento Ótico de Caracteres)
+              </Typography>
+            </Box>
+          </Box>
+          <Button
+            variant="contained"
+            startIcon={<RefreshIcon />}
+            onClick={loadDocumentos}
+            disabled={loading}
+          >
+            Atualizar
+          </Button>
+        </Box>
 
-      {/* Mensagens */}
+        {/* Mensagens */}
       {error && (
         <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>
           {error}
@@ -470,96 +392,134 @@ const DocumentosPage = () => {
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress />
         </Box>
+      ) : documentos.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <ScannerIcon sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
+          <Typography variant="h6" gutterBottom>
+            Nenhum documento escaneado
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Você ainda não possui documentos processados com OCR.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" paragraph>
+            Para escanear um novo documento, acesse:
+          </Typography>
+          <Button
+            variant="contained"
+            startIcon={<ScannerIcon />}
+            onClick={() => handleNavigate('/scanner')}
+          >
+            Escanear Documento
+          </Button>
+        </Paper>
       ) : (
-        <Grid container spacing={2}>
-          {documentos.map((doc) => (
-            <Grid item xs={12} sm={6} md={4} key={doc.id}>
-              <Card>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flex: 1 }}>
-                      <FileIconComponent tipo={doc.tipo_arquivo} />
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Typography variant="h6" noWrap>
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>Título</TableCell>
+                <TableCell>Data Upload</TableCell>
+                <TableCell>Tamanho</TableCell>
+                <TableCell>Preview OCR</TableCell>
+                <TableCell>Visualizações</TableCell>
+                <TableCell align="right">Ações</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {documentos.map((doc) => (
+                <TableRow key={doc.id} hover>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <DescriptionIcon color="primary" />
+                      <Box>
+                        <Typography variant="body2" fontWeight="medium">
                           {doc.titulo}
                         </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {doc.tamanho_formatado} • {doc.tipo_arquivo?.toUpperCase()}
-                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
+                          {doc.confidencial && (
+                            <Chip label="Confidencial" size="small" color="error" />
+                          )}
+                          <Chip label="OCR" size="small" color="info" />
+                        </Box>
                       </Box>
                     </Box>
-                    <IconButton size="small" onClick={(e) => handleMenuOpen(e, doc)}>
-                      <MoreVertIcon />
-                    </IconButton>
-                  </Box>
-
-                  {doc.descricao && (
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }} noWrap>
-                      {doc.descricao}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {doc.data_upload ? format(new Date(doc.data_upload), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '-'}
                     </Typography>
-                  )}
-
-                  {doc.categoria_nome && (
-                    <Chip
-                      label={doc.categoria_nome}
-                      size="small"
-                      sx={{ mt: 1 }}
-                    />
-                  )}
-
-                  {doc.confidencial && (
-                    <Chip
-                      label="Confidencial"
-                      size="small"
-                      color="error"
-                      sx={{ mt: 1, ml: 1 }}
-                    />
-                  )}
-
-                  {doc.tags_list && doc.tags_list.length > 0 && (
-                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                      {doc.tags_list.map((tag, idx) => (
-                        <Chip key={idx} label={tag} size="small" variant="outlined" />
-                      ))}
+                  </TableCell>
+                  <TableCell>
+                    <Typography variant="body2">
+                      {doc.tamanho_formatado || '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Typography 
+                      variant="caption" 
+                      color="text.secondary"
+                      sx={{ 
+                        display: 'block',
+                        maxWidth: 300,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        fontStyle: 'italic'
+                      }}
+                    >
+                      {doc.texto_extraido ? doc.texto_extraido.substring(0, 100) + '...' : '-'}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <VisibilityIcon fontSize="small" color="action" />
+                      <Typography variant="body2">{doc.visualizacoes || 0}</Typography>
                     </Box>
-                  )}
-
-                  <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                    <Tooltip title="Visualizações">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <VisibilityIcon fontSize="small" color="action" />
-                        <Typography variant="caption">{doc.visualizacoes || 0}</Typography>
-                      </Box>
+                  </TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Visualizar">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleView(doc)}
+                        color="primary"
+                      >
+                        <VisibilityIcon />
+                      </IconButton>
                     </Tooltip>
-                    <Tooltip title="Downloads">
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                        <DownloadIcon fontSize="small" color="action" />
-                        <Typography variant="caption">{doc.downloads || 0}</Typography>
-                      </Box>
+                    <Tooltip title="Editar">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleEdit(doc)}
+                        color="primary"
+                      >
+                        <EditIcon />
+                      </IconButton>
                     </Tooltip>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+                    <Tooltip title="Download">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDownload(doc)}
+                        color="primary"
+                      >
+                        <DownloadIcon />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Deletar">
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDelete(doc)}
+                        color="error"
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       )}
-
-      {/* Menu de Ações */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose}>
-        <MenuItem onClick={() => { handleView(menuDoc); }}>
-          <VisibilityIcon sx={{ mr: 1 }} /> Visualizar
-        </MenuItem>
-        <MenuItem onClick={() => { handleDownload(menuDoc); }}>
-          <DownloadIcon sx={{ mr: 1 }} /> Download
-        </MenuItem>
-        <MenuItem onClick={() => { handleEdit(menuDoc); handleMenuClose(); }}>
-          <EditIcon sx={{ mr: 1 }} /> Editar
-        </MenuItem>
-        <MenuItem onClick={() => handleDelete(menuDoc)}>
-          <DeleteIcon sx={{ mr: 1 }} /> Deletar
-        </MenuItem>
-      </Menu>
 
       {/* Visualizador de Documentos */}
       <DocumentViewer
@@ -569,132 +529,6 @@ const DocumentosPage = () => {
         onIncrementView={handleIncrementView}
         onDownload={handleDownload}
       />
-
-      {/* Dialog Upload */}
-      <Dialog open={uploadDialogOpen} onClose={() => setUploadDialogOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Novo Documento
-          <IconButton
-            onClick={() => setUploadDialogOpen(false)}
-            sx={{ position: 'absolute', right: 8, top: 8 }}
-          >
-            <CloseIcon />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent>
-          <Box sx={{ mt: 2 }}>
-            <input
-              type="file"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-              id="upload-file"
-              accept=".pdf,.doc,.docx,.txt,.xlsx,.xls,.jpg,.jpeg,.png"
-            />
-            <label htmlFor="upload-file">
-              <Button
-                variant="outlined"
-                component="span"
-                fullWidth
-                startIcon={<CloudUploadIcon />}
-                sx={{ mb: 2 }}
-              >
-                {uploadFile ? uploadFile.name : 'Selecionar Arquivo'}
-              </Button>
-            </label>
-
-            <TextField
-              fullWidth
-              label="Título"
-              value={uploadData.titulo}
-              onChange={(e) => setUploadData({ ...uploadData, titulo: e.target.value })}
-              sx={{ mb: 2 }}
-              required
-            />
-
-            <TextField
-              fullWidth
-              label="Descrição"
-              value={uploadData.descricao}
-              onChange={(e) => setUploadData({ ...uploadData, descricao: e.target.value })}
-              multiline
-              rows={3}
-              sx={{ mb: 2 }}
-            />
-
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Categoria</InputLabel>
-              <Select
-                value={uploadData.categoria}
-                onChange={(e) => setUploadData({ ...uploadData, categoria: e.target.value })}
-                label="Categoria"
-              >
-                {categorias.map((cat) => (
-                  <MenuItem key={cat.id} value={cat.id}>
-                    {cat.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <FormControl fullWidth sx={{ mb: 2 }}>
-              <InputLabel>Tags</InputLabel>
-              <Select
-                multiple
-                value={uploadData.tags_ids}
-                onChange={(e) => setUploadData({ ...uploadData, tags_ids: e.target.value })}
-                input={<OutlinedInput label="Tags" />}
-                renderValue={(selected) => (
-                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((tagId) => {
-                      const tag = tags.find(t => t.id === tagId);
-                      return tag ? <Chip key={tagId} label={tag.nome} size="small" /> : null;
-                    })}
-                  </Box>
-                )}
-              >
-                {tags.map((tag) => (
-                  <MenuItem key={tag.id} value={tag.id}>
-                    {tag.nome}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-
-            <TextField
-              fullWidth
-              label="Data do Documento"
-              type="date"
-              value={uploadData.data_documento}
-              onChange={(e) => setUploadData({ ...uploadData, data_documento: e.target.value })}
-              InputLabelProps={{ shrink: true }}
-              sx={{ mb: 2 }}
-            />
-
-            <FormControlLabel
-              control={
-                <Checkbox
-                  checked={uploadData.confidencial}
-                  onChange={(e) => setUploadData({ ...uploadData, confidencial: e.target.checked })}
-                />
-              }
-              label="Documento Confidencial"
-            />
-
-            {uploadProgress > 0 && (
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="caption">Enviando: {uploadProgress}%</Typography>
-                <CircularProgress variant="determinate" value={uploadProgress} />
-              </Box>
-            )}
-          </Box>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setUploadDialogOpen(false)}>Cancelar</Button>
-          <Button onClick={handleUpload} variant="contained" disabled={!uploadFile || loading}>
-            Enviar
-          </Button>
-        </DialogActions>
-      </Dialog>
 
       {/* Dialog Editar */}
       <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="sm" fullWidth>
@@ -718,6 +552,18 @@ const DocumentosPage = () => {
                 rows={3}
                 sx={{ mb: 2 }}
               />
+              {selectedDoc.texto_extraido && (
+                <TextField
+                  fullWidth
+                  label="Texto Extraído (OCR)"
+                  value={selectedDoc.texto_extraido || ''}
+                  onChange={(e) => setSelectedDoc({ ...selectedDoc, texto_extraido: e.target.value })}
+                  multiline
+                  rows={8}
+                  sx={{ mb: 2 }}
+                  helperText="Texto extraído por OCR - você pode editar se necessário"
+                />
+              )}
               <FormControlLabel
                 control={
                   <Checkbox
@@ -737,6 +583,7 @@ const DocumentosPage = () => {
           </Button>
         </DialogActions>
       </Dialog>
+      </Paper>
     </Box>
   );
 };
