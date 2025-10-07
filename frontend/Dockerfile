@@ -17,8 +17,11 @@ RUN npm install
 # Copiar código da aplicação
 COPY . .
 
-# Expor porta do React
-EXPOSE 3000
+# Expor porta do React (mudada para 3001 para evitar conflito com Easypanel)
+EXPOSE 3001
+
+# Definir porta customizada
+ENV PORT=3001
 
 # Comando para iniciar o servidor de desenvolvimento
 CMD ["npm", "start"]
