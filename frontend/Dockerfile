@@ -23,5 +23,13 @@ EXPOSE 3001
 # Definir porta customizada
 ENV PORT=3001
 
+# Desabilitar verificação de host (necessário para deployment)
+ENV DANGEROUSLY_DISABLE_HOST_CHECK=true
+
+# Permitir qualquer host do webpack dev server
+ENV WDS_SOCKET_HOST=0.0.0.0
+ENV WATCHPACK_POLLING=true
+ENV CHOKIDAR_USEPOLLING=true
+
 # Comando para iniciar o servidor de desenvolvimento
 CMD ["npm", "start"]
