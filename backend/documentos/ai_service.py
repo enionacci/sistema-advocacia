@@ -5,6 +5,7 @@ Serviço para processamento de OCR e Análise com IA
 import os
 import io
 import platform
+import uuid
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any
 from django.core.files.base import ContentFile
@@ -13,6 +14,7 @@ import pytesseract
 from pdf2image import convert_from_bytes
 from PIL import Image
 from openai import OpenAI
+from .progress_service import progress_tracker
 
 
 # Configuração do Tesseract para Windows
@@ -31,7 +33,7 @@ if platform.system() == 'Windows':
         print("⚠️ Tesseract não encontrado. Instale em: https://github.com/UB-Mannheim/tesseract/wiki")
 
 
-# Configuração do Poppler para Windows
+# Configuração do Poppler para Windows e Linux
 POPPLER_PATH = None
 if platform.system() == 'Windows':
     possible_poppler_paths = [
@@ -46,6 +48,14 @@ if platform.system() == 'Windows':
             break
     else:
         print("⚠️ Poppler não encontrado. PDFs não serão suportados para OCR.")
+elif platform.system() == 'Linux':
+    # No Linux, poppler-utils instala os binários no PATH
+    import shutil
+    if shutil.which('pdftoppm'):
+        POPPLER_PATH = None  # None significa usar PATH padrão
+        print("✅ Poppler encontrado no sistema Linux")
+    else:
+        print("⚠️ Poppler não encontrado no Linux. Instale: apt-get install poppler-utils")
 
 
 class OCRService:
@@ -55,34 +65,61 @@ class OCRService:
     """
     
     @staticmethod
-    def extract_text_from_pdf(arquivo_bytes: bytes) -> str:
+    def extract_text_from_pdf(arquivo_bytes: bytes, task_id: str = None) -> str:
         """
-        Extrai texto de um PDF usando OCR
+        Extrai texto de um PDF usando OCR com rastreamento de progresso
         
         Args:
             arquivo_bytes: Bytes do arquivo PDF
+            task_id: ID da tarefa para rastreamento de progresso
             
         Returns:
             Texto extraído do PDF
         """
+        # Gera ID único se não fornecido
+        if not task_id:
+            task_id = str(uuid.uuid4())
+        
         try:
+            # Inicia rastreamento de progresso
+            progress_tracker.start_progress(task_id, 0)
+            
             # Verifica se Poppler está disponível
-            if not POPPLER_PATH:
+            if platform.system() == 'Windows' and not POPPLER_PATH:
+                progress_tracker.complete_progress(task_id, False, "Poppler não está configurado")
                 raise Exception("Poppler não está configurado. PDFs não são suportados no momento.")
             
-            # Converte PDF para imagens usando o caminho do Poppler
-            images = convert_from_bytes(
-                arquivo_bytes,
-                dpi=300,  # Alta resolução para melhor OCR
-                fmt='png',
-                poppler_path=POPPLER_PATH  # Adiciona o caminho do Poppler
-            )
+            progress_tracker.update_progress(task_id, 0, "Convertendo PDF para imagens...")
+            
+            # Converte PDF para imagens
+            if POPPLER_PATH:
+                # Windows com caminho específico
+                images = convert_from_bytes(
+                    arquivo_bytes,
+                    dpi=300,  # Alta resolução para melhor OCR
+                    fmt='png',
+                    poppler_path=POPPLER_PATH
+                )
+            else:
+                # Linux com PATH padrão
+                images = convert_from_bytes(
+                    arquivo_bytes,
+                    dpi=300,  # Alta resolução para melhor OCR
+                    fmt='png'
+                )
+            
+            total_paginas = len(images)
+            progress_tracker.set_total_pages(task_id, total_paginas)
             
             texto_completo = []
             
             # Faz OCR em cada página
             for i, image in enumerate(images):
-                print(f"📄 Processando página {i + 1}/{len(images)}...")
+                pagina_atual = i + 1
+                print(f"📄 Processando página {pagina_atual}/{total_paginas}...")
+                
+                # Atualiza progresso real
+                progress_tracker.update_progress(task_id, pagina_atual)
                 
                 # Extrai texto da imagem
                 texto = pytesseract.image_to_string(
@@ -94,9 +131,14 @@ class OCRService:
                 if texto.strip():
                     texto_completo.append(f"--- Página {i + 1} ---\n{texto}")
             
-            return "\n\n".join(texto_completo)
+            # Marca como concluído
+            texto_final = "\n\n".join(texto_completo)
+            progress_tracker.complete_progress(task_id, True)
+            
+            return texto_final
             
         except Exception as e:
+            progress_tracker.complete_progress(task_id, False, f"Erro: {str(e)}")
             raise Exception(f"Erro ao extrair texto do PDF: {str(e)}")
     
     @staticmethod
@@ -127,13 +169,14 @@ class OCRService:
             raise Exception(f"Erro ao extrair texto da imagem: {str(e)}")
     
     @staticmethod
-    def extract_text(arquivo_path: str, tipo_arquivo: str) -> str:
+    def extract_text(arquivo_path: str, tipo_arquivo: str, task_id: str = None) -> str:
         """
         Extrai texto de um arquivo (PDF ou imagem)
         
         Args:
             arquivo_path: Caminho do arquivo
             tipo_arquivo: Tipo do arquivo (pdf, jpg, png, etc)
+            task_id: ID da tarefa para rastreamento de progresso
             
         Returns:
             Texto extraído
@@ -142,7 +185,7 @@ class OCRService:
             arquivo_bytes = f.read()
         
         if tipo_arquivo.lower() == 'pdf':
-            return OCRService.extract_text_from_pdf(arquivo_bytes)
+            return OCRService.extract_text_from_pdf(arquivo_bytes, task_id)
         elif tipo_arquivo.lower() in ['jpg', 'jpeg', 'png', 'tiff', 'bmp']:
             return OCRService.extract_text_from_image(arquivo_bytes)
         else:
@@ -296,6 +339,22 @@ class AIAnalysisService:
                 prompt_template = self.get_prompt_template(tipo_analise)
                 prompt = prompt_template.format(texto=texto)
             
+            # Determina parâmetros baseado no modelo
+            api_params = {}
+            
+            # Modelos que usam max_completion_tokens e não suportam temperature personalizado
+            if any(model_name in modelo.lower() for model_name in ['gpt-5', 'o1']):
+                api_params['max_completion_tokens'] = 4000
+                # Não adiciona temperature (usa padrão 1)
+            # Modelos que usam max_completion_tokens mas suportam temperature
+            elif any(model_name in modelo.lower() for model_name in ['gpt-4.1', 'gpt-4o-2024']):
+                api_params['max_completion_tokens'] = 4000
+                api_params['temperature'] = 0.3
+            # Modelos antigos (GPT-4, GPT-3.5)
+            else:
+                api_params['max_tokens'] = 4000
+                api_params['temperature'] = 0.3
+            
             # Chama a API da OpenAI
             response = self.client.chat.completions.create(
                 model=modelo,
@@ -309,13 +368,14 @@ class AIAnalysisService:
                         "content": prompt
                     }
                 ],
-                temperature=0.3,  # Mais determinístico para análises
-                max_tokens=4000
+                **api_params
             )
             
             # Extrai resposta
             resultado = response.choices[0].message.content
             tokens_usados = response.usage.total_tokens
+            
+
             
             # Calcula custo estimado (valores aproximados GPT-4)
             custo_por_mil_tokens = 0.03  # USD

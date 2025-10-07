@@ -8,6 +8,7 @@ import {
   MenuItem,
   Alert,
   CircularProgress,
+  LinearProgress,
   Stepper,
   Step,
   StepLabel,
@@ -27,27 +28,17 @@ import {
 } from '@mui/icons-material';
 import axios from '../utils/axiosInstance';
 
-const TIPOS_ANALISE = [
-  { value: 'resumo', label: 'Resumo Executivo', description: 'Resumo conciso do documento' },
-  { value: 'extracao_dados', label: 'Extração de Dados', description: 'Extrai informações estruturadas' },
-  { value: 'juridico', label: 'Análise Jurídica', description: 'Análise sob perspectiva jurídica' },
-  { value: 'contrato', label: 'Análise de Contrato', description: 'Cláusulas, riscos e obrigações' },
-  { value: 'risco', label: 'Análise de Risco', description: 'Identifica riscos e alertas' },
-  { value: 'personalizado', label: 'Personalizado', description: 'Análise com prompt customizado' }
-];
-
 const ScannerPage = () => {
-  // Estados
+  // Estados simplificados para apenas escanear e salvar
   const [activeStep, setActiveStep] = useState(0);
   const [arquivo, setArquivo] = useState(null);
   const [textoExtraido, setTextoExtraido] = useState('');
-  const [tipoAnalise, setTipoAnalise] = useState('resumo');
-  const [promptPersonalizado, setPromptPersonalizado] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
 
-  const steps = ['Upload do Documento', 'Extração de Texto (OCR)', 'Análise com IA'];
+  const steps = ['Upload do Documento', 'Extração de Texto (OCR)', 'Salvar Documento'];
 
   // Funções
   const handleFileChange = (event) => {
@@ -62,6 +53,7 @@ const ScannerPage = () => {
     setArquivo(null);
     setTextoExtraido('');
     setActiveStep(0);
+    setProgress({ current: 0, total: 0 });
   };
 
   const handleOCR = async () => {
@@ -72,24 +64,92 @@ const ScannerPage = () => {
 
     setLoading(true);
     setError('');
+    setProgress({ current: 0, total: 0 });
 
     try {
       const formData = new FormData();
       formData.append('arquivo', arquivo);
 
-      const response = await axios.post('/api/documentos/ocr/', formData, {
+      // Inicia processamento assíncrono
+      const response = await axios.post('/api/documentos/ocr-async/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
       });
 
-      setTextoExtraido(response.data.texto);
-      setActiveStep(1);
-      setSuccess('Texto extraído com sucesso!');
+      if (response.data.success) {
+        const taskId = response.data.task_id;
+        
+        // Monitora progresso real - consulta mais rápida no início, depois mais lenta
+        let consultaIntervalo = 500; // Inicia com 500ms
+        const maxIntervalo = 2000; // Máximo de 2 segundos
+        
+        const consultarProgresso = async () => {
+          try {
+            const progressResponse = await axios.get(`/api/documentos/ocr-progress/${taskId}/`);
+            const progressData = progressResponse.data;
+            
+            console.log('📊 Progresso:', progressData);
+            
+            setProgress({
+              current: progressData.current_page,
+              total: progressData.total_pages
+            });
+            
+            // Se concluído com sucesso
+            if (progressData.status === 'concluido') {
+              console.log('✅ Processamento concluído!');
+              setLoading(false);
+              setProgress({ current: 0, total: 0 });
+              
+              if (progressData.resultado && progressData.resultado.texto) {
+                setTextoExtraido(progressData.resultado.texto);
+                setActiveStep(1); // IMPORTANTE: Move para próximo step
+                setSuccess('Texto extraído com sucesso!');
+                console.log('📄 Texto definido e step atualizado');
+              } else {
+                setError('Texto não encontrado no resultado');
+              }
+              return; // Para de consultar
+            } else if (progressData.status === 'erro') {
+              console.error('❌ Erro no processamento:', progressData.message);
+              setLoading(false);
+              setProgress({ current: 0, total: 0 });
+              setError(progressData.message || 'Erro no processamento');
+              return; // Para de consultar
+            }
+            
+            // Aumenta intervalo gradualmente para reduzir carga
+            consultaIntervalo = Math.min(consultaIntervalo + 100, maxIntervalo);
+            
+            // Agenda próxima consulta
+            setTimeout(consultarProgresso, consultaIntervalo);
+            
+          } catch (progressError) {
+            console.error('Erro ao consultar progresso:', progressError);
+            // Em caso de erro, tenta novamente após intervalo maior
+            setTimeout(consultarProgresso, 2000);
+          }
+        };
+        
+        // Inicia primeira consulta
+        consultarProgresso();
+        
+        // Timeout de segurança (3 minutos) - tempo mais realista
+        setTimeout(() => {
+          setLoading(false);
+          setProgress({ current: 0, total: 0 });
+          setError('Timeout: Processamento demorou mais que o esperado (3 min)');
+        }, 180000); // 3 minutos
+        
+      } else {
+        setError(response.data.error || 'Erro ao iniciar processamento');
+        setLoading(false);
+      }
+      
     } catch (err) {
       setError(err.response?.data?.error || 'Erro ao processar OCR');
       console.error('Erro no OCR:', err);
-    } finally {
       setLoading(false);
     }
   };
@@ -111,13 +171,13 @@ const ScannerPage = () => {
 
       await axios.post('/api/documentos/salvar-ocr/', payload);
       
-      setSuccess('Documento salvo com sucesso!');
+      setSuccess('Documento salvo com sucesso! Use a opção "Análise com IA" no menu para analisar documentos salvos.');
       
-      // Limpar após 2 segundos
+      // Limpar tudo após salvar com sucesso
       setTimeout(() => {
         handleRemoveFile();
         setSuccess('');
-      }, 2000);
+      }, 3000);
 
     } catch (err) {
       console.error('❌ Erro ao salvar documento:', err);
@@ -127,54 +187,6 @@ const ScannerPage = () => {
     }
   };
 
-  const handleAnaliseIA = async () => {
-    if (!textoExtraido) {
-      setError('É necessário extrair o texto primeiro');
-      return;
-    }
-
-    if (tipoAnalise === 'personalizado' && !promptPersonalizado.trim()) {
-      setError('Por favor, forneça instruções personalizadas');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const payload = {
-        texto: textoExtraido,
-        tipo_analise: tipoAnalise,
-        prompt_personalizado: tipoAnalise === 'personalizado' ? promptPersonalizado : null
-      };
-
-      console.log('📤 Enviando payload:', payload);
-
-      const response = await axios.post('/api/documentos/analises/', payload);
-
-      setActiveStep(2);
-      setSuccess('Análise solicitada com sucesso! Você pode acompanhar o progresso na página de Análises.');
-      
-      // Limpar após 3 segundos
-      setTimeout(() => {
-        handleRemoveFile();
-        setSuccess('');
-        setPromptPersonalizado('');
-        setTipoAnalise('resumo');
-      }, 3000);
-
-    } catch (err) {
-      console.error('❌ Erro completo:', err);
-      console.error('❌ Resposta do servidor:', err.response?.data);
-      setError(err.response?.data?.error || 'Erro ao solicitar análise');
-      console.error('Erro na análise IA:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const tipoAnaliseSelecionada = TIPOS_ANALISE.find(t => t.value === tipoAnalise);
-
   return (
     <Box sx={{ p: 3 }}>
       <Paper sx={{ p: 3, mb: 3 }}>
@@ -182,10 +194,10 @@ const ScannerPage = () => {
           <ScannerIcon sx={{ fontSize: 40, mr: 2, color: 'primary.main' }} />
           <Box>
             <Typography variant="h4" gutterBottom>
-              Scanner & Análise com IA
+              Scanner de Documentos
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              Escaneie documentos, extraia texto e analise com inteligência artificial
+              Escaneie documentos e extraia texto usando OCR (Reconhecimento Óptico de Caracteres)
             </Typography>
           </Box>
         </Box>
@@ -259,6 +271,20 @@ const ScannerPage = () => {
                   </Button>
                 </Box>
               )}
+              
+              {/* Indicador de progresso para PDFs */}
+              {loading && progress.total > 0 && (
+                <Box sx={{ mt: 2 }}>
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                    Processando página {progress.current} de {progress.total}...
+                  </Typography>
+                  <LinearProgress 
+                    variant="determinate" 
+                    value={(progress.current / progress.total) * 100} 
+                    sx={{ height: 6, borderRadius: 3 }}
+                  />
+                </Box>
+              )}
             </CardContent>
           </Card>
         )}
@@ -276,7 +302,7 @@ const ScannerPage = () => {
                 </Box>
                 
                 <Alert severity="info" sx={{ mb: 2 }}>
-                  Você pode <strong>salvar o documento</strong> com o texto extraído ou <strong>prosseguir para análise com IA</strong>.
+                  Após extrair o texto, você pode <strong>salvar o documento</strong>. Use "Análise com IA" no menu para analisar documentos salvos.
                 </Alert>
                 
                 <TextField
@@ -304,89 +330,16 @@ const ScannerPage = () => {
                   onClick={handleSaveDocument}
                   disabled={!textoExtraido.trim() || loading}
                   startIcon={loading ? <CircularProgress size={20} /> : null}
-                  sx={{ mr: 2 }}
+                  size="large"
                 >
                   {loading ? 'Salvando...' : 'Salvar Documento'}
-                </Button>
-                <Button
-                  variant="contained"
-                  onClick={() => setActiveStep(2)}
-                  disabled={!textoExtraido.trim()}
-                  endIcon={<AIIcon />}
-                >
-                  Prosseguir para Análise
                 </Button>
               </CardContent>
             </Card>
           </>
         )}
 
-        {/* STEP 2: Análise IA */}
-        {activeStep === 2 && (
-          <Card variant="outlined">
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
-                3. Configurar Análise com IA
-              </Typography>
 
-              <Grid container spacing={3}>
-                <Grid item xs={12}>
-                  <TextField
-                    select
-                    fullWidth
-                    label="Tipo de Análise"
-                    value={tipoAnalise}
-                    onChange={(e) => setTipoAnalise(e.target.value)}
-                    helperText={tipoAnaliseSelecionada?.description}
-                  >
-                    {TIPOS_ANALISE.map((tipo) => (
-                      <MenuItem key={tipo.value} value={tipo.value}>
-                        {tipo.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-
-                {tipoAnalise === 'personalizado' && (
-                  <Grid item xs={12}>
-                    <TextField
-                      fullWidth
-                      multiline
-                      rows={4}
-                      label="Instruções Personalizadas"
-                      value={promptPersonalizado}
-                      onChange={(e) => setPromptPersonalizado(e.target.value)}
-                      placeholder="Descreva o que você deseja que a IA analise no documento..."
-                      helperText="Seja específico sobre o que você quer extrair ou analisar"
-                    />
-                  </Grid>
-                )}
-
-                <Grid item xs={12}>
-                  <Divider sx={{ my: 2 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Button
-                      variant="outlined"
-                      onClick={() => setActiveStep(1)}
-                      startIcon={<ClearIcon />}
-                    >
-                      Voltar
-                    </Button>
-                    <Button
-                      variant="contained"
-                      onClick={handleAnaliseIA}
-                      disabled={loading}
-                      startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
-                      color="success"
-                    >
-                      {loading ? 'Enviando...' : 'Solicitar Análise IA'}
-                    </Button>
-                  </Box>
-                </Grid>
-              </Grid>
-            </CardContent>
-          </Card>
-        )}
       </Paper>
     </Box>
   );

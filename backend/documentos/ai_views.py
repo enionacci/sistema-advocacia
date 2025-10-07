@@ -5,6 +5,8 @@ Views para Scanner & Análise com IA
 from rest_framework import generics, status, views
 from rest_framework.response import Response
 from django.utils import timezone
+from django.http import JsonResponse
+from django.db import transaction
 from .models import Documento, DocumentoAnaliseIA
 from .serializers import (
     DocumentoAnaliseIAListSerializer,
@@ -12,8 +14,148 @@ from .serializers import (
     DocumentoAnaliseIACreateSerializer
 )
 from .ai_service import OCRService, AIAnalysisService
+from .progress_service import progress_tracker
 from escritorios.permissions import HasPermission
 import os
+import uuid
+import threading
+import tempfile
+
+
+class DocumentoOCRAsyncView(views.APIView):
+    """
+    View para processar OCR assíncrono com rastreamento de progresso
+    POST: Inicia processamento OCR e retorna task_id para acompanhamento
+    """
+    permission_classes = [HasPermission]
+    required_permission = 'escanear_documento'
+    
+    def post(self, request):
+        """
+        Inicia processamento OCR assíncrono
+        """
+        try:
+            # Validação
+            if 'arquivo' not in request.FILES:
+                return Response(
+                    {'error': 'Arquivo não fornecido'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            arquivo = request.FILES['arquivo']
+            tipo_arquivo = os.path.splitext(arquivo.name)[1].lower().replace('.', '')
+            
+            # Valida tipo de arquivo
+            tipos_suportados = ['pdf', 'jpg', 'jpeg', 'png', 'tiff', 'bmp']
+            if tipo_arquivo not in tipos_suportados:
+                return Response(
+                    {'error': f'Tipo de arquivo não suportado. Use: {", ".join(tipos_suportados)}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Gera ID único para a tarefa
+            task_id = str(uuid.uuid4())
+            
+            # Salva arquivo temporariamente (compatível com Windows)
+            temp_dir = tempfile.gettempdir()
+            temp_path = os.path.join(temp_dir, f'{task_id}_{arquivo.name}')
+            print(f"💾 Salvando arquivo temporário em: {temp_path}")
+            
+            with open(temp_path, 'wb+') as temp_file:
+                for chunk in arquivo.chunks():
+                    temp_file.write(chunk)
+            
+            # Inicia processamento em thread separada
+            def processar_ocr():
+                try:
+                    print(f"🔄 Iniciando processamento OCR para task {task_id}")
+                    texto_extraido = OCRService.extract_text(temp_path, tipo_arquivo, task_id)
+                    print(f"✅ OCR concluído. Texto extraído: {len(texto_extraido)} caracteres")
+                    
+                    # Salva resultado diretamente no tracker com mutexes
+                    with progress_tracker._lock:
+                        if task_id in progress_tracker._progress_data:
+                            progress_tracker._progress_data[task_id]['resultado'] = {
+                                'texto': texto_extraido,
+                                'nome_arquivo': arquivo.name,
+                                'tipo_arquivo': tipo_arquivo,
+                                'tamanho': arquivo.size
+                            }
+                            print(f"💾 Resultado salvo no tracker para task {task_id}")
+                    
+                except Exception as e:
+                    print(f"❌ Erro no processamento OCR: {str(e)}")
+                    progress_tracker.complete_progress(task_id, False, f"Erro: {str(e)}")
+                finally:
+                    # Remove arquivo temporário
+                    if os.path.exists(temp_path):
+                        os.remove(temp_path)
+                        print(f"🗑️ Arquivo temporário removido: {temp_path}")
+            
+            # Inicia thread de processamento
+            thread = threading.Thread(target=processar_ocr)
+            thread.daemon = True
+            thread.start()
+            
+            # Retorna task_id para acompanhamento
+            return Response({
+                'success': True,
+                'task_id': task_id,
+                'message': 'Processamento iniciado. Use o task_id para acompanhar o progresso.'
+            }, status=status.HTTP_202_ACCEPTED)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Erro ao iniciar processamento OCR: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class DocumentoOCRProgressView(views.APIView):
+    """
+    View para consultar progresso de processamento OCR
+    GET: Retorna status atual do processamento
+    """
+    permission_classes = [HasPermission]
+    required_permission = 'escanear_documento'
+    
+    def get(self, request, task_id):
+        """
+        Consulta progresso de uma tarefa de OCR
+        """
+        try:
+            progress_data = progress_tracker.get_progress(task_id)
+            
+            if not progress_data:
+                return Response(
+                    {'error': 'Tarefa não encontrada ou expirada'},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Se concluído com sucesso, inclui o resultado
+            response_data = {
+                'task_id': task_id,
+                'status': progress_data['status'],
+                'current_page': progress_data['current_page'],
+                'total_pages': progress_data['total_pages'],
+                'percentage': progress_data['percentage'],
+                'message': progress_data['message'],
+                'elapsed_seconds': progress_data['elapsed_seconds']
+            }
+            
+            # Se concluído com sucesso, inclui resultado
+            if progress_data['status'] == 'concluido' and 'resultado' in progress_data:
+                response_data['resultado'] = progress_data['resultado']
+                print(f"📤 Enviando resultado para frontend - task {task_id}: {len(progress_data['resultado'].get('texto', ''))} chars")
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            return Response(
+                {'error': f'Erro ao consultar progresso: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 
 class DocumentoOCRView(views.APIView):
@@ -176,6 +318,7 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
         texto = request.data.get('texto')
         tipo_analise = request.data.get('tipo_analise', 'resumo')
         prompt_personalizado = request.data.get('prompt_personalizado')
+        modelo_ia = request.data.get('modelo_ia', 'gpt-5-nano-2025-08-07')  # GPT-5 Nano como padrão
         cliente_id = request.data.get('cliente_id')
         
         # Validações
@@ -232,6 +375,7 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
             usuario=usuario,
             tipo_analise=tipo_analise,
             prompt_personalizado=prompt_personalizado,
+            modelo_ia=modelo_ia,
             status='pendente'
         )
         
@@ -243,10 +387,14 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
             analise.mensagem_erro = str(e)
             analise.save()
         
+        # Recarrega análise do banco para ter dados atualizados
+        analise.refresh_from_db()
+        
         # Retorna análise criada
         serializer = DocumentoAnaliseIADetailSerializer(analise)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
     
+    @transaction.atomic
     def _processar_analise(self, analise: DocumentoAnaliseIA):
         """
         Processa a análise com IA
@@ -276,22 +424,33 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
         resultado = ai_service.analyze_document(
             texto=texto,
             tipo_analise=analise.tipo_analise,
-            prompt_personalizado=analise.prompt_personalizado
+            prompt_personalizado=analise.prompt_personalizado,
+            modelo=analise.modelo_ia
         )
         
         # Atualiza análise
-        analise.resultado = resultado['resultado']
-        analise.tokens_usados = resultado['tokens_usados']
-        analise.custo_estimado = resultado['custo_estimado']
-        analise.tempo_processamento = resultado['tempo_processamento']
-        analise.modelo_ia = resultado['modelo_ia']
-        analise.status = resultado['status']
-        analise.data_conclusao = timezone.now()
-        
-        if resultado.get('mensagem_erro'):
-            analise.mensagem_erro = resultado['mensagem_erro']
-        
-        analise.save()
+        try:
+            analise.resultado = resultado['resultado']
+            analise.tokens_usados = resultado['tokens_usados']
+            analise.custo_estimado = resultado['custo_estimado']
+            
+            # O campo tempo_processamento é DurationField, então deve receber timedelta
+            analise.tempo_processamento = resultado['tempo_processamento']
+                
+            analise.modelo_ia = resultado['modelo_ia']
+            analise.status = resultado['status']
+            analise.data_conclusao = timezone.now()
+            
+            if resultado.get('mensagem_erro'):
+                analise.mensagem_erro = resultado['mensagem_erro']
+            
+            analise.save()
+            
+        except Exception as save_error:
+            analise.status = 'erro'
+            analise.mensagem_erro = f"Erro ao salvar: {str(save_error)}"
+            analise.save()
+            raise
 
 
 class DocumentoAnaliseIADetailView(generics.RetrieveUpdateDestroyAPIView):

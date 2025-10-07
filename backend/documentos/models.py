@@ -440,3 +440,185 @@ class DocumentoAnaliseIA(models.Model):
     
     def __str__(self):
         return f"{self.get_tipo_analise_display()} - {self.documento.titulo} ({self.status})"
+
+
+class DocumentoAnonimizacao(models.Model):
+    """
+    Controle de anonimização de documentos com possibilidade de reversão
+    """
+    STATUS_CHOICES = [
+        ('pendente', 'Pendente'),
+        ('processando', 'Processando'),
+        ('concluido', 'Concluído'),
+        ('erro', 'Erro'),
+        ('revertido', 'Revertido'),
+    ]
+    
+    escritorio = models.ForeignKey(
+        Escritorio,
+        on_delete=models.CASCADE,
+        related_name='anonimizacoes',
+        verbose_name='Escritório'
+    )
+    documento = models.ForeignKey(
+        Documento,
+        on_delete=models.CASCADE,
+        related_name='anonimizacoes',
+        verbose_name='Documento'
+    )
+    usuario = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='anonimizacoes_solicitadas',
+        verbose_name='Usuário que solicitou'
+    )
+    
+    # Controle de status
+    status = models.CharField(
+        max_length=15,
+        choices=STATUS_CHOICES,
+        default='pendente',
+        verbose_name='Status'
+    )
+    
+    # Textos
+    texto_original = models.TextField(
+        verbose_name='Texto Original',
+        help_text='Backup do texto antes da anonimização'
+    )
+    texto_anonimizado = models.TextField(
+        blank=True,
+        verbose_name='Texto Anonimizado'
+    )
+    
+    # Configurações da anonimização
+    anonimizar_nomes = models.BooleanField(
+        default=True,
+        verbose_name='Anonimizar Nomes'
+    )
+    anonimizar_cpf = models.BooleanField(
+        default=True,
+        verbose_name='Anonimizar CPF'
+    )
+    anonimizar_rg = models.BooleanField(
+        default=True,
+        verbose_name='Anonimizar RG'
+    )
+    anonimizar_enderecos = models.BooleanField(
+        default=True,
+        verbose_name='Anonimizar Endereços'
+    )
+    anonimizar_telefones = models.BooleanField(
+        default=True,
+        verbose_name='Anonimizar Telefones'
+    )
+    anonimizar_emails = models.BooleanField(
+        default=True,
+        verbose_name='Anonimizar E-mails'
+    )
+    
+    # Metadados
+    data_solicitacao = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Data da Solicitação'
+    )
+    data_conclusao = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Data da Conclusão'
+    )
+    data_reversao = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name='Data da Reversão'
+    )
+    mensagem_erro = models.TextField(
+        blank=True,
+        verbose_name='Mensagem de Erro'
+    )
+    
+    class Meta:
+        verbose_name = 'Anonimização de Documento'
+        verbose_name_plural = 'Anonimizações de Documentos'
+        ordering = ['-data_solicitacao']
+        indexes = [
+            models.Index(fields=['escritorio', '-data_solicitacao']),
+            models.Index(fields=['documento', '-data_solicitacao']),
+            models.Index(fields=['status']),
+        ]
+    
+    def __str__(self):
+        return f"Anonimização - {self.documento.titulo} ({self.status})"
+
+
+class AnonimizacaoItem(models.Model):
+    """
+    Armazena cada substituição feita na anonimização para permitir reversão
+    """
+    TIPO_DADO_CHOICES = [
+        ('nome', 'Nome'),
+        ('cpf', 'CPF'),
+        ('rg', 'RG'),
+        ('endereco', 'Endereço'),
+        ('telefone', 'Telefone'),
+        ('email', 'E-mail'),
+        ('outro', 'Outro'),
+    ]
+    
+    anonimizacao = models.ForeignKey(
+        DocumentoAnonimizacao,
+        on_delete=models.CASCADE,
+        related_name='itens',
+        verbose_name='Anonimização'
+    )
+    
+    # Dados da substituição
+    tipo_dado = models.CharField(
+        max_length=20,
+        choices=TIPO_DADO_CHOICES,
+        verbose_name='Tipo de Dado'
+    )
+    valor_original = models.TextField(
+        verbose_name='Valor Original',
+        help_text='Valor real encontrado no documento'
+    )
+    valor_anonimizado = models.CharField(
+        max_length=100,
+        verbose_name='Valor Anonimizado',
+        help_text='Placeholder usado na substituição (ex: NOME1, CPF1)'
+    )
+    
+    # Metadados para localização
+    posicao_inicio = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Posição Início',
+        help_text='Posição do caractere no texto original'
+    )
+    posicao_fim = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name='Posição Fim'
+    )
+    contexto = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name='Contexto',
+        help_text='Trecho do texto ao redor para validação'
+    )
+    
+    # Auditoria
+    data_criacao = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Data de Criação'
+    )
+    
+    class Meta:
+        verbose_name = 'Item de Anonimização'
+        verbose_name_plural = 'Itens de Anonimização'
+        ordering = ['posicao_inicio']
+        unique_together = ['anonimizacao', 'valor_anonimizado']
+    
+    def __str__(self):
+        return f"{self.get_tipo_dado_display()}: {self.valor_anonimizado}"

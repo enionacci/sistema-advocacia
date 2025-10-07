@@ -26,6 +26,8 @@ import AuditLogStatsPage from './pages/AuditLogStatsPage';
 import DocumentosPage from './pages/DocumentosPage';
 import ScannerPage from './pages/ScannerPage';
 import AnalysesPage from './pages/AnalysesPage';
+import AnonymizePage from './pages/AnonymizePage';
+import AIAnalysisPage from './pages/AIAnalysisPage';
 
 function App() {
   const { user } = useAuth();
@@ -135,7 +137,23 @@ function App() {
                     } 
                   />
                   <Route 
-                    path="/scanner/documentos" 
+                    path="/anonimizar" 
+                    element={
+                      <PrivateRoute>
+                        <AnonymizePage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/analise-ia" 
+                    element={
+                      <PrivateRoute>
+                        <AIAnalysisPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/documentos" 
                     element={
                       <PrivateRoute>
                         <DocumentosPage />
@@ -143,7 +161,7 @@ function App() {
                     } 
                   />
                   <Route 
-                    path="/scanner/analises" 
+                    path="/analises" 
                     element={
                       <PrivateRoute>
                         <AnalysesPage />
