@@ -156,13 +156,17 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000", # Endereço do nosso frontend React
+    "http://localhost:3000",  # Desenvolvimento local
+    "http://localhost:3001",  # Desenvolvimento local (porta alternativa)
+    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção
 ]
 
 # Origens confiáveis para CSRF
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://127.0.0.1:3000",
+    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção
 ]
 
 # Permitir iframes do frontend (para visualizador de documentos)
