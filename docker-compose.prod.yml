@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # Backend Django - Produção
+  backend:
+    image: enionacci/advocacia-backend:latest  # SUBSTITUA 'enionacci' pelo seu username
+    container_name: advocacia-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=False
+      - SECRET_KEY=${SECRET_KEY}
+      - DB_NAME=${DB_NAME}
+      - DB_USER=${DB_USER}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_HOST=${DB_HOST:-localhost}
+      - DB_PORT=${DB_PORT:-5432}
+      - FERNET_KEY=${FERNET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+    volumes:
+      - backend-static:/app/staticfiles
+      - backend-media:/app/media
+    restart: unless-stopped
+    networks:
+      - advocacia-network
+
+  # Frontend React - Produção
+  frontend:
+    image: enionacci/advocacia-frontend:latest  # SUBSTITUA 'enionacci' pelo seu username
+    container_name: advocacia-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=${REACT_APP_API_URL:-http://localhost:8000}
+      - NODE_ENV=production
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - advocacia-network
+
+  # Nginx (Opcional - para servir frontend em produção)
+  # nginx:
+  #   image: nginx:alpine
+  #   container_name: advocacia-nginx
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   volumes:
+  #     - ./nginx.conf:/etc/nginx/nginx.conf:ro
+  #     - backend-static:/usr/share/nginx/html/static:ro
+  #     - backend-media:/usr/share/nginx/html/media:ro
+  #   depends_on:
+  #     - backend
+  #     - frontend
+  #   restart: unless-stopped
+  #   networks:
+  #     - advocacia-network
+
+volumes:
+  backend-static:
+  backend-media:
+
+networks:
+  advocacia-network:
+    driver: bridge
