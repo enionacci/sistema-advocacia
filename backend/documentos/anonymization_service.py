@@ -35,8 +35,18 @@ class AnonymizationService:
         self.hf_token = os.getenv("HF_TOKEN")
         self.model_id = "gpt-oss/120b-cloud"
         
+        print(f"🔍 DEBUG - Inicializando AnonymizationService")
+        print(f"🔍 DEBUG - HF_TOKEN presente: {'Sim' if self.hf_token else 'Não'}")
+        print(f"🔍 DEBUG - HF_TOKEN (primeiros 10 chars): {self.hf_token[:10] if self.hf_token else 'N/A'}...")
+        print(f"🔍 DEBUG - Model ID: {self.model_id}")
+        
         if self.hf_token:
-            self.client = InferenceClient(model=self.model_id, token=self.hf_token)
+            try:
+                self.client = InferenceClient(model=self.model_id, token=self.hf_token)
+                print(f"✅ DEBUG - Cliente Hugging Face inicializado com sucesso")
+            except Exception as e:
+                self.client = None
+                print(f"❌ DEBUG - Erro ao inicializar cliente Hugging Face: {str(e)}")
         else:
             self.client = None
             print("⚠️ Token do Hugging Face não encontrado. Funcionalidade de IA desabilitada.")
@@ -308,6 +318,7 @@ RESPOSTA:"""
         """
         try:
             print(f"🔒 Iniciando anonimização com {'IA Hugging Face' if use_ai else 'Regex'}")
+            print(f"🔍 DEBUG - use_ai={use_ai}, self.client={self.client is not None}")
             
             # Marca como processando
             anonimizacao.status = 'processando'
@@ -326,13 +337,17 @@ RESPOSTA:"""
                 'anonimizar_emails': anonimizacao.anonimizar_emails,
             }
             
+            print(f"🔍 DEBUG - Configuração: {config}")
+            
             # Processa baseado no método escolhido
             if use_ai and self.client:
+                print(f"✅ DEBUG - Usando IA Hugging Face")
                 texto_anonimizado, substituicoes = self.detect_and_anonymize_ai(
                     anonimizacao.texto_original, 
                     config
                 )
             else:
+                print(f"⚠️ DEBUG - Usando Regex (use_ai={use_ai}, client={self.client is not None})")
                 texto_anonimizado, substituicoes = self.detect_and_anonymize_regex(
                     anonimizacao.texto_original
                 )
