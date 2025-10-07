@@ -158,7 +158,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",  # Desenvolvimento local
     "http://localhost:3001",  # Desenvolvimento local (porta alternativa)
-    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção
+    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção (Easypanel)
+    "https://advocacia.nacciadvocacia.com.br",  # Frontend em produção (domínio customizado)
 ]
 
 # Origens confiáveis para CSRF
@@ -166,7 +167,8 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
-    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção
+    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção (Easypanel)
+    "https://advocacia.nacciadvocacia.com.br",  # Frontend em produção (domínio customizado)
 ]
 
 # Permitir iframes do frontend (para visualizador de documentos)

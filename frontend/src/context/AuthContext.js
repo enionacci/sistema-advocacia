@@ -30,7 +30,8 @@ export const AuthProvider = ({ children }) => {
   const fetchAndSetAuthData = useCallback(async (accessToken) => {
     setLoading(true);
     try {
-      const userResponse = await axios.get('http://127.0.0.1:8000/api/auth/users/me/', {
+      const apiURL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+      const userResponse = await axios.get(`${apiURL}/api/auth/users/me/`, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });
       setUser(userResponse.data);
