@@ -71,6 +71,9 @@ class AnonymizationService:
         Returns:
             Tuple com (texto_anonimizado, lista_substituicoes)
         """
+        print(f"🔍 DEBUG REGEX - Iniciando anonimização por regex")
+        print(f"🔍 DEBUG REGEX - Texto original (primeiros 200 chars): {texto[:200]}")
+        
         substituicoes = []
         texto_anonimizado = texto
         
@@ -87,11 +90,14 @@ class AnonymizationService:
         # Processar cada tipo de dado
         for tipo_dado, pattern in patterns.items():
             matches = list(re.finditer(pattern, texto_anonimizado, re.IGNORECASE))
+            print(f"🔍 DEBUG REGEX - Tipo '{tipo_dado}': encontrados {len(matches)} matches")
             
             # Processar matches de trás para frente para manter posições
             for match in reversed(matches):
                 valor_original = match.group()
                 placeholder = self.get_next_placeholder(tipo_dado)
+                
+                print(f"🔍 DEBUG REGEX - Match: '{valor_original}' -> '{placeholder}'")
                 
                 # Substituir no texto
                 texto_anonimizado = (
@@ -109,6 +115,9 @@ class AnonymizationService:
                     'posicao_fim': match.end(),
                     'contexto': self._get_context(texto, match.start(), match.end())
                 })
+        
+        print(f"🔍 DEBUG REGEX - Total de substituições: {len(substituicoes)}")
+        print(f"🔍 DEBUG REGEX - Texto anonimizado (primeiros 200 chars): {texto_anonimizado[:200]}")
         
         return texto_anonimizado, substituicoes
     
@@ -196,6 +205,9 @@ RESPOSTA:"""
         Returns:
             Tuple com (texto_anonimizado, lista_substituicoes)
         """
+        print(f"🔍 DEBUG - Resposta da IA completa:\n{resposta}\n")
+        print(f"🔍 DEBUG - Tamanho da resposta: {len(resposta)} caracteres")
+        
         lines = resposta.strip().split('\n')
         texto_anonimizado = ""
         substituicoes = []
@@ -208,9 +220,11 @@ RESPOSTA:"""
             # Detectar seções
             if 'TEXTO ANONIMIZADO' in line.upper() or line.startswith('1.'):
                 current_section = 'texto'
+                print(f"🔍 DEBUG - Detectada seção de TEXTO")
                 continue
             elif 'SUBSTITUIÇÕES' in line.upper() or 'SUBSTITUICOES' in line.upper() or line.startswith('2.'):
                 current_section = 'substituicoes'
+                print(f"🔍 DEBUG - Detectada seção de SUBSTITUIÇÕES")
                 continue
             
             if current_section == 'texto' and line:
@@ -218,6 +232,7 @@ RESPOSTA:"""
                 if not ('SUBSTITUIÇÕES' in line.upper() or 'SUBSTITUICOES' in line.upper() or line.startswith('2.')):
                     texto_anonimizado += line + ' '
             elif current_section == 'substituicoes' and line and '|' in line:
+                print(f"🔍 DEBUG - Processando linha de substituição: {line}")
                 parts = line.split('|')
                 if len(parts) >= 3:
                     tipo_map = {
@@ -233,6 +248,8 @@ RESPOSTA:"""
                     tipo_dado = tipo_map.get(tipo_original, 'outro')
                     valor_original = parts[1].strip()
                     valor_anonimizado = parts[2].strip()
+                    
+                    print(f"🔍 DEBUG - Substituição: {tipo_dado} | {valor_original} -> {valor_anonimizado}")
                     
                     substituicoes.append({
                         'tipo_dado': tipo_dado,
@@ -326,9 +343,12 @@ RESPOSTA:"""
             anonimizacao.data_conclusao = timezone.now()
             anonimizacao.save()
             
+            print(f"🔍 DEBUG - Total de substituições para salvar: {len(substituicoes)}")
+            
             # Salva substituições individuais
-            for sub in substituicoes:
-                AnonimizacaoItem.objects.create(
+            for idx, sub in enumerate(substituicoes, 1):
+                print(f"🔍 DEBUG - Salvando substituição {idx}/{len(substituicoes)}: {sub}")
+                item = AnonimizacaoItem.objects.create(
                     anonimizacao=anonimizacao,
                     tipo_dado=sub['tipo_dado'],
                     valor_original=sub['valor_original'],
@@ -337,6 +357,11 @@ RESPOSTA:"""
                     posicao_fim=sub.get('posicao_fim'),
                     contexto=sub.get('contexto', '')
                 )
+                print(f"✅ DEBUG - Item {idx} salvo com ID: {item.id}")
+            
+            # Verificar quantos itens foram realmente salvos
+            total_itens_salvos = AnonimizacaoItem.objects.filter(anonimizacao=anonimizacao).count()
+            print(f"📊 DEBUG - Total de itens salvos no banco: {total_itens_salvos}")
             
             # Atualiza texto do documento
             documento = anonimizacao.documento
