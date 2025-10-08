@@ -30,7 +30,13 @@ export const AuthProvider = ({ children }) => {
   const fetchAndSetAuthData = useCallback(async (accessToken) => {
     setLoading(true);
     try {
-      const apiURL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+      let apiURL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+      
+      // Se o frontend estiver em HTTPS, força o backend também usar HTTPS
+      if (window.location.protocol === 'https:' && apiURL.startsWith('http://')) {
+        apiURL = apiURL.replace('http://', 'https://');
+      }
+      
       const userResponse = await axios.get(`${apiURL}/api/auth/users/me/`, {
         headers: { 'Authorization': `Bearer ${accessToken}` }
       });

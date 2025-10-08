@@ -14,18 +14,21 @@ ENV PYTHONUNBUFFERED=1 \
 # Diretório de trabalho
 WORKDIR /app
 
+
 # Instalar dependências do sistema
 # - tesseract-ocr: OCR engine
 # - tesseract-ocr-por: Pacote de idioma português
 # - poppler-utils: Para converter PDF em imagens
 # - libpq-dev: Para PostgreSQL
 # - gcc: Compilador necessário para alguns pacotes Python
+# - ffmpeg: Conversão e processamento de áudio/vídeo
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
     tesseract-ocr-por \
     poppler-utils \
     libpq-dev \
     gcc \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Verificar instalação do Tesseract

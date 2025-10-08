@@ -18,7 +18,9 @@ from .anonymization_views import (
     anonymize_document,
     restore_document,
     list_anonymizations,
-    anonymization_details
+    anonymization_details,
+    delete_anonymization,
+    deanonymize_text
 )
 
 router = DefaultRouter()
@@ -41,6 +43,8 @@ urlpatterns = [
     path('<int:documento_id>/restore/', restore_document, name='documento-restore'),
     path('anonymizations/', list_anonymizations, name='anonymizations-list'),
     path('anonymizations/<int:anonimizacao_id>/', anonymization_details, name='anonymization-details'),
+    path('anonymizations/<int:anonimizacao_id>/delete/', delete_anonymization, name='anonymization-delete'),
+    path('anonymizations/<int:anonimizacao_id>/deanonymize/', deanonymize_text, name='deanonymize-text'),
     
     # ViewSets (deve vir por último)
     path('', include(router.urls)),

@@ -33,7 +33,7 @@ class AnonymizationService:
         Inicializa o serviço de anonimização com Hugging Face
         """
         self.hf_token = os.getenv("HF_TOKEN")
-        self.model_id = "gpt-oss/120b-cloud"
+        self.model_id = "openai/gpt-oss-120b"
         
         print(f"🔍 DEBUG - Inicializando AnonymizationService")
         print(f"🔍 DEBUG - HF_TOKEN presente: {'Sim' if self.hf_token else 'Não'}")
@@ -161,44 +161,92 @@ class AnonymizationService:
         if config.get('anonimizar_emails', True):
             tipos_para_anonimizar.append('E-mails')
         
-        prompt = f"""Você é um assistente especializado em anonimização de textos para compliance LGPD.
+        prompt = f"""Você é um especialista em anonimização de documentos jurídicos para compliance LGPD. Sua tarefa é receber um texto jurídico e realizar sua completa anonimização, substituindo informações sensíveis por variáveis padronizadas.
 
-TAREFA: Anonimize o seguinte texto substituindo os dados pessoais por placeholders conforme especificado.
+INSTRUÇÕES PARA ANONIMIZAÇÃO:
 
-TIPOS DE DADOS PARA ANONIMIZAR:
-{', '.join(tipos_para_anonimizar)}
+1. Identifique e substitua as seguintes informações por variáveis:
+   - Nomes de pessoas físicas → NOME1, NOME2, NOME3...
+   - Nomes de pessoas jurídicas/empresas → EMPRESA1, EMPRESA2, EMPRESA3...
+   - Endereços completos → ENDERECO1, ENDERECO2, ENDERECO3...
+   - CPFs → CPF1, CPF2, CPF3...
+   - RGs → RG1, RG2, RG3...
+   - Números de telefone (incluindo WhatsApp) → TELEFONE1, TELEFONE2, TELEFONE3...
+   - E-mails → EMAIL1, EMAIL2, EMAIL3...
+   - Numero do processo → PROCESSO1, PROCESSO2, PROCESSO3...
 
-REGRAS DE SUBSTITUIÇÃO:
-- Nomes de pessoas: NOME1, NOME2, NOME3...
-- CPFs: CPF1, CPF2, CPF3...
-- RGs: RG1, RG2, RG3...
-- Endereços: ENDERECO1, ENDERECO2, ENDERECO3...
-- Telefones: TELEFONE1, TELEFONE2, TELEFONE3...
-- E-mails: EMAIL1, EMAIL2, EMAIL3...
+2. Mantenha a estrutura e formatação original do texto
+3. Preserve termos jurídicos técnicos e números de OAB
+4. Mantenha a coerência (a mesma pessoa deve ter sempre a mesma variável)
 
-FORMATO DE RESPOSTA:
-1. Primeiro apresente o TEXTO ANONIMIZADO completo
-2. Depois apresente as SUBSTITUIÇÕES no formato:
-   TIPO|VALOR_ORIGINAL|PLACEHOLDER
+FORMATO DE RESPOSTA OBRIGATÓRIO:
 
-TEXTO ORIGINAL:
-{texto}
+Forneça sua resposta em duas seções:
 
-RESPOSTA:"""
+## TEXTO ANONIMIZADO:
+[Texto completamente anonimizado aqui]
+
+## DICIONARIO DE VARIAVEIS:
+[Lista das substituições realizadas no formato EXATO:]
+NOME1 → João da Silva Santos
+ENDERECO1 → Rua das Flores, 123, Centro, São Paulo/SP
+CPF1 → 123.456.789-00
+TELEFONE1 → (11) 98765-4321
+EMAIL1 → joao@exemplo.com
+
+IMPORTANTE: Use exatamente o formato "VARIAVEL → CONTEUDO_ORIGINAL" (com a seta →)
+
+TEXTO JURÍDICO PARA ANONIMIZAR:
+
+{texto}"""
         
         try:
             print(f"🤖 Enviando texto para anonimização via Hugging Face ({self.model_id})")
+            print(f"📊 Tamanho do texto: {len(texto)} caracteres")
             
-            response = self.client.text_generation(
-                prompt,
-                max_new_tokens=2048,
-                temperature=0.3,  # Mais determinístico para anonimização
-                top_k=50,
-                do_sample=True,
+            # Usar chat_completion em vez de text_generation (suportado pelo modelo)
+            messages = [
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+            
+            response = self.client.chat_completion(
+                messages=messages,
+                max_tokens=16000,  # ✅ Aumentado para suportar documentos maiores
+                temperature=0.1,  # Muito determinístico
             )
             
+            # Extrair o conteúdo da resposta
+            response_text = response.choices[0].message.content
+            
             print(f"✅ Resposta recebida do Hugging Face")
-            return self._parse_ai_response(response)
+            print(f"🔍 DEBUG - Primeiros 500 chars da resposta:\n{response_text[:500]}\n")
+            
+            # Aplicar substituições ao texto original
+            texto_anonimizado = texto
+            _, substituicoes = self._parse_ai_response(response_text)
+            
+            print(f"📊 DEBUG - Total de substituições encontradas: {len(substituicoes)}")
+            
+            # Aplicar cada substituição
+            for idx, sub in enumerate(substituicoes, 1):
+                valor_original = sub['valor_original']
+                valor_anonimizado = sub['valor_anonimizado']
+                
+                # Verificar se o valor original existe no texto
+                if valor_original in texto_anonimizado:
+                    texto_anonimizado = texto_anonimizado.replace(valor_original, valor_anonimizado)
+                    print(f"✅ Substituição {idx}: '{valor_original}' → '{valor_anonimizado}' (APLICADA)")
+                else:
+                    print(f"⚠️ Substituição {idx}: '{valor_original}' não encontrado no texto")
+            
+            print(f"📄 Texto final anonimizado (primeiros 300 chars): {texto_anonimizado[:300]}")
+            print(f"📄 Texto original (primeiros 300 chars): {texto[:300]}")
+            print(f"🔍 Textos são iguais? {texto == texto_anonimizado}")
+            
+            return texto_anonimizado, substituicoes
             
         except Exception as e:
             print(f"❌ Erro na anonimização com Hugging Face: {str(e)}")
@@ -207,10 +255,10 @@ RESPOSTA:"""
     
     def _parse_ai_response(self, resposta: str) -> Tuple[str, List[Dict]]:
         """
-        Processa resposta da IA para extrair texto anonimizado e substituições
+        Processa resposta da IA para extrair substituições e aplicar ao texto
         
         Args:
-            resposta: Resposta da IA
+            resposta: Resposta da IA (lista de substituições)
             
         Returns:
             Tuple com (texto_anonimizado, lista_substituicoes)
@@ -218,69 +266,68 @@ RESPOSTA:"""
         print(f"🔍 DEBUG - Resposta da IA completa:\n{resposta}\n")
         print(f"🔍 DEBUG - Tamanho da resposta: {len(resposta)} caracteres")
         
-        lines = resposta.strip().split('\n')
-        texto_anonimizado = ""
         substituicoes = []
         
-        current_section = None
+        # Procurar pelo dicionário de variáveis na resposta
+        linhas = resposta.strip().split('\n')
+        em_dicionario = False
         
-        for line in lines:
+        for line in linhas:
             line = line.strip()
             
-            # Detectar seções
-            if 'TEXTO ANONIMIZADO' in line.upper() or line.startswith('1.'):
-                current_section = 'texto'
-                print(f"🔍 DEBUG - Detectada seção de TEXTO")
-                continue
-            elif 'SUBSTITUIÇÕES' in line.upper() or 'SUBSTITUICOES' in line.upper() or line.startswith('2.'):
-                current_section = 'substituicoes'
-                print(f"🔍 DEBUG - Detectada seção de SUBSTITUIÇÕES")
+            # Detectar início do dicionário
+            if 'DICIONARIO' in line.upper() or 'DICTIONARY' in line.upper():
+                em_dicionario = True
                 continue
             
-            if current_section == 'texto' and line:
-                # Evitar linhas de cabeçalho
-                if not ('SUBSTITUIÇÕES' in line.upper() or 'SUBSTITUICOES' in line.upper() or line.startswith('2.')):
-                    texto_anonimizado += line + ' '
-            elif current_section == 'substituicoes' and line and '|' in line:
-                print(f"🔍 DEBUG - Processando linha de substituição: {line}")
-                parts = line.split('|')
-                if len(parts) >= 3:
-                    tipo_map = {
-                        'NOME': 'nome',
-                        'CPF': 'cpf',
-                        'RG': 'rg',
-                        'ENDERECO': 'endereco',
-                        'TELEFONE': 'telefone',
-                        'EMAIL': 'email'
-                    }
+            # Se estamos no dicionário e a linha tem formato de substituição
+            if em_dicionario and '→' in line:
+                try:
+                    print(f"🔍 DEBUG - Processando linha: {line}")
                     
-                    tipo_original = parts[0].strip().upper()
-                    tipo_dado = tipo_map.get(tipo_original, 'outro')
-                    valor_original = parts[1].strip()
-                    valor_anonimizado = parts[2].strip()
-                    
-                    print(f"🔍 DEBUG - Substituição: {tipo_dado} | {valor_original} -> {valor_anonimizado}")
-                    
-                    substituicoes.append({
-                        'tipo_dado': tipo_dado,
-                        'valor_original': valor_original,
-                        'valor_anonimizado': valor_anonimizado,
-                        'posicao_inicio': None,
-                        'posicao_fim': None,
-                        'contexto': ''
-                    })
+                    # Formato: VARIAVEL → CONTEUDO_ORIGINAL
+                    parts = line.split('→')
+                    if len(parts) >= 2:
+                        variavel = parts[0].strip()
+                        valor_original = parts[1].strip()
+                        
+                        # Extrair tipo e número da variável (ex: NOME1 -> nome, CPF2 -> cpf)
+                        import re
+                        match = re.match(r'([A-Z]+)(\d+)', variavel)
+                        if match:
+                            tipo_var = match.group(1)
+                            
+                            tipo_map = {
+                                'NOME': 'nome',
+                                'CPF': 'cpf',
+                                'RG': 'rg',
+                                'ENDERECO': 'endereco',
+                                'ENDEREÇO': 'endereco',
+                                'TELEFONE': 'telefone',
+                                'EMAIL': 'email',
+                                'EMPRESA': 'nome',
+                                'PROCESSO': 'outro'
+                            }
+                            
+                            tipo_dado = tipo_map.get(tipo_var, 'outro')
+                            
+                            print(f"✅ DEBUG - Substituição: {tipo_dado} | '{valor_original}' -> '{variavel}'")
+                            
+                            substituicoes.append({
+                                'tipo_dado': tipo_dado,
+                                'valor_original': valor_original,
+                                'valor_anonimizado': variavel,
+                                'posicao_inicio': None,
+                                'posicao_fim': None,
+                                'contexto': ''
+                            })
+                except Exception as e:
+                    print(f"⚠️ Erro ao processar linha '{line}': {str(e)}")
+                    continue
         
-        # Limpar o texto anonimizado
-        texto_anonimizado = texto_anonimizado.strip()
+        print(f"📊 Total de {len(substituicoes)} substituições extraídas")
         
-        # Se não conseguiu extrair o texto, tentar extrair de forma mais simples
-        if not texto_anonimizado:
-            # Pegar tudo até a primeira menção de substituições
-            resposta_parts = resposta.split('SUBSTITUIÇÕES')[0].split('SUBSTITUICOES')[0]
-            texto_anonimizado = resposta_parts.strip()
-        
-        print(f"📊 Extraídas {len(substituicoes)} substituições")
-        return texto_anonimizado, substituicoes
+        return "", substituicoes
     
     def _get_context(self, texto: str, inicio: int, fim: int, tamanho_contexto: int = 50) -> str:
         """
@@ -338,6 +385,7 @@ RESPOSTA:"""
             }
             
             print(f"🔍 DEBUG - Configuração: {config}")
+            print(f"🔍 DEBUG - Texto original (primeiros 300 chars): {anonimizacao.texto_original[:300]}")
             
             # Processa baseado no método escolhido
             if use_ai and self.client:
@@ -378,12 +426,12 @@ RESPOSTA:"""
             total_itens_salvos = AnonimizacaoItem.objects.filter(anonimizacao=anonimizacao).count()
             print(f"📊 DEBUG - Total de itens salvos no banco: {total_itens_salvos}")
             
-            # Atualiza texto do documento
-            documento = anonimizacao.documento
-            documento.texto_extraido = texto_anonimizado
-            documento.save()
+            # ✅ NÃO atualizar o texto do documento original
+            # O texto anonimizado fica apenas em anonimizacao.texto_anonimizado
+            # O documento mantém seu texto_extraido original
             
             print(f"✅ Anonimização concluída: {len(substituicoes)} substituições")
+            print(f"📄 Texto original preservado - anonimização disponível em texto_anonimizado")
             return True
             
         except Exception as e:
@@ -392,6 +440,64 @@ RESPOSTA:"""
             anonimizacao.mensagem_erro = str(e)
             anonimizacao.save()
             return False
+    
+    def deanonymize_text(self, texto_anonimizado: str, anonimizacao_id: int) -> Tuple[str, int]:
+        """
+        Desanonimiza um texto usando o dicionário de uma anonimização existente.
+        Ideal para reverter textos processados por IA externa (ChatGPT).
+        
+        Fluxo de uso:
+        1. Anonimiza petição inicial → texto anônimo
+        2. Envia texto anônimo para ChatGPT → recebe contestação anônima
+        3. Usa este método para desanonimizar a contestação → contestação com dados reais
+        
+        Args:
+            texto_anonimizado: Texto contendo placeholders (NOME1, CPF1, etc)
+            anonimizacao_id: ID da anonimização que contém o dicionário
+            
+        Returns:
+            Tupla (texto_desanonimizado, total_substituicoes_feitas)
+        """
+        try:
+            # Busca a anonimização e seus itens
+            anonimizacao = DocumentoAnonimizacao.objects.get(id=anonimizacao_id)
+            itens = anonimizacao.itens.all().order_by('-valor_anonimizado')  # Ordem reversa para evitar conflitos
+            
+            print(f"🔍 Desanonimizando texto usando dicionário da anonimização #{anonimizacao_id}")
+            print(f"📚 Total de itens no dicionário: {itens.count()}")
+            
+            if not itens.exists():
+                print(f"⚠️ Nenhum item de substituição encontrado!")
+                return texto_anonimizado, 0
+            
+            texto_resultante = texto_anonimizado
+            substituicoes_realizadas = 0
+            
+            # Para cada item no dicionário, substitui o placeholder pelo valor real
+            for item in itens:
+                placeholder = item.valor_anonimizado  # Ex: NOME1, CPF1
+                valor_real = item.valor_original      # Ex: João Silva, 123.456.789-00
+                
+                # Conta quantas ocorrências existem no texto
+                ocorrencias = texto_resultante.count(placeholder)
+                
+                if ocorrencias > 0:
+                    texto_resultante = texto_resultante.replace(placeholder, valor_real)
+                    substituicoes_realizadas += ocorrencias
+                    print(f"✅ Substituído '{placeholder}' por '{valor_real}' ({ocorrencias}x)")
+                else:
+                    print(f"⚠️ Placeholder '{placeholder}' não encontrado no texto")
+            
+            print(f"✅ Desanonimização concluída: {substituicoes_realizadas} substituições realizadas")
+            
+            return texto_resultante, substituicoes_realizadas
+            
+        except DocumentoAnonimizacao.DoesNotExist:
+            print(f"❌ Anonimização #{anonimizacao_id} não encontrada")
+            raise Exception(f"Anonimização #{anonimizacao_id} não encontrada")
+        except Exception as e:
+            print(f"❌ Erro na desanonimização: {str(e)}")
+            raise Exception(f"Erro na desanonimização: {str(e)}")
     
     def reverse_anonymization(self, anonimizacao: DocumentoAnonimizacao) -> bool:
         """

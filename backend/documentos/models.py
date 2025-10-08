@@ -8,6 +8,8 @@ Models para o Sistema de Gerenciamento de Documentos
 
 import os
 import hashlib
+import unicodedata
+import re
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.core.validators import FileExtensionValidator
@@ -15,6 +17,32 @@ from clientes.models import Cliente
 from escritorios.models import Escritorio
 
 User = get_user_model()
+
+
+def sanitize_filename(filename):
+    """
+    Remove acentos e caracteres especiais do nome do arquivo
+    Mantém apenas letras, números, pontos, hífens e underscores
+    """
+    # Separar nome e extensão
+    name, ext = os.path.splitext(filename)
+    
+    # Remover acentos (NFD = Normalization Form Canonical Decomposition)
+    name = unicodedata.normalize('NFD', name)
+    name = name.encode('ascii', 'ignore').decode('utf-8')
+    
+    # Substituir espaços por underscores
+    name = name.replace(' ', '_')
+    
+    # Remover caracteres especiais, mantendo apenas alfanuméricos, - e _
+    name = re.sub(r'[^a-zA-Z0-9_-]', '', name)
+    
+    # Evitar nomes vazios
+    if not name:
+        name = 'documento'
+    
+    # Retornar com extensão
+    return f"{name}{ext}"
 
 
 class Categoria(models.Model):
@@ -110,8 +138,13 @@ def documento_upload_path(instance, filename):
     """
     Define o caminho de upload dos documentos
     Organiza por: escritorio/cliente/ano/mes/filename
+    Remove acentos e caracteres especiais do nome do arquivo
     """
     import datetime
+    
+    # Limpa o nome do arquivo
+    filename = sanitize_filename(filename)
+    
     now = datetime.datetime.now()
     return os.path.join(
         'documentos',
@@ -274,23 +307,42 @@ class Documento(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.titulo} - {self.cliente.nome_completo}"
+        if self.cliente:
+            return f"{self.titulo} - {self.cliente.nome_completo}"
+        return f"{self.titulo}"
 
     def save(self, *args, **kwargs):
         """
         Calcula o hash MD5 do arquivo no primeiro save
         """
-        if self.arquivo and not self.hash_md5:
-            md5_hash = hashlib.md5()
-            for chunk in self.arquivo.chunks():
-                md5_hash.update(chunk)
-            self.hash_md5 = md5_hash.hexdigest()
+        # Verifica se é um update parcial (ex: apenas visualizacoes, ativo, etc)
+        update_fields = kwargs.get('update_fields', None)
+        should_process_file = (
+            update_fields is None or 
+            'arquivo' in update_fields or
+            'nome_original' in update_fields or
+            'tipo_arquivo' in update_fields or
+            'tamanho' in update_fields or
+            'hash_md5' in update_fields
+        )
         
-        # Extrai tipo e tamanho do arquivo
-        if self.arquivo:
-            self.nome_original = os.path.basename(self.arquivo.name)
-            self.tipo_arquivo = os.path.splitext(self.arquivo.name)[1].lower().replace('.', '')
-            self.tamanho = self.arquivo.size
+        # Só processa o arquivo se necessário
+        if should_process_file:
+            if self.arquivo and not self.hash_md5:
+                md5_hash = hashlib.md5()
+                for chunk in self.arquivo.chunks():
+                    md5_hash.update(chunk)
+                self.hash_md5 = md5_hash.hexdigest()
+            
+            # Extrai tipo e tamanho do arquivo
+            if self.arquivo:
+                try:
+                    self.nome_original = os.path.basename(self.arquivo.name)
+                    self.tipo_arquivo = os.path.splitext(self.arquivo.name)[1].lower().replace('.', '')
+                    self.tamanho = self.arquivo.size
+                except (FileNotFoundError, OSError):
+                    # Se o arquivo físico não existir, mantém os valores existentes
+                    pass
 
         super().save(*args, **kwargs)
 

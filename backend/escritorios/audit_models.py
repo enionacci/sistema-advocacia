@@ -203,16 +203,17 @@ class AuditLog(models.Model):
         }
         
         # Adiciona dados do escritório se disponível
-        if hasattr(usuario, 'perfil') and usuario.perfil.escritorio:
+        if hasattr(usuario, 'perfil') and usuario.perfil and usuario.perfil.escritorio:
             log_data['escritorio_id'] = usuario.perfil.escritorio.id
             log_data['escritorio_nome'] = usuario.perfil.escritorio.nome
         
         # Adiciona dados opcionais
         if 'objeto' in kwargs:
             obj = kwargs.pop('objeto')
-            log_data['content_object'] = obj
-            log_data['objeto_repr'] = str(obj)
-            log_data['modelo_nome'] = obj.__class__.__name__
+            if obj:  # ✅ Verifica se objeto não é None
+                log_data['content_object'] = obj
+                log_data['objeto_repr'] = str(obj)
+                log_data['modelo_nome'] = obj.__class__.__name__
         
         # Merge com kwargs restantes
         log_data.update(kwargs)

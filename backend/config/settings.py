@@ -209,6 +209,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 # Configuração da Criptografia
 SALT_KEY = os.getenv('FERNET_KEY')
 
+# Configuração para django-encrypted-model-fields
+FIELD_ENCRYPTION_KEY = os.getenv('FERNET_KEY')
+
 # Configuração de Email (para desenvolvimento)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'nao-responda@sistemadeadvocacia.com'

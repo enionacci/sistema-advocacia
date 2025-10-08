@@ -2,7 +2,13 @@
 import axios from 'axios';
 
 // Usa a variável de ambiente ou localhost como fallback
-const baseURL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+let baseURL = process.env.REACT_APP_API_URL || 'http://127.0.0.1:8000';
+
+// Se o frontend estiver em HTTPS, força o backend também usar HTTPS
+if (window.location.protocol === 'https:' && baseURL.startsWith('http://')) {
+    baseURL = baseURL.replace('http://', 'https://');
+    console.log('🔒 Forçando HTTPS para API:', baseURL);
+}
 
 // Função para pegar o cookie CSRF
 function getCookie(name) {

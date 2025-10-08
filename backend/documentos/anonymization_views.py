@@ -168,12 +168,20 @@ def list_anonymizations(request):
         
         data = []
         for anon in anonimizacoes:
+            # Contar total de substituições
+            total_substituicoes = AnonimizacaoItem.objects.filter(anonimizacao=anon).count()
+            
+            # Determinar tipo de anonimização (padrão: 'ia')
+            tipo_anonimizacao = 'ia'  # Por padrão, assume IA
+            
             data.append({
                 'id': anon.id,
                 'documento_id': anon.documento.id,
                 'documento_titulo': anon.documento.titulo or f'Documento {anon.documento.id}',
                 'cliente_nome': anon.documento.cliente.nome_completo if anon.documento.cliente else 'N/A',
                 'status': anon.status,
+                'tipo_anonimizacao': tipo_anonimizacao,
+                'total_substituicoes': total_substituicoes,
                 'data_solicitacao': anon.data_solicitacao,
                 'data_conclusao': anon.data_conclusao,
                 'data_reversao': anon.data_reversao,
@@ -242,24 +250,26 @@ def anonymization_details(request, anonimizacao_id):
                 'titulo': anonimizacao.documento.titulo,
                 'cliente_nome': anonimizacao.documento.cliente.nome_completo if anonimizacao.documento.cliente else 'N/A',
             },
+            'documento_titulo': anonimizacao.documento.titulo or f'Documento {anonimizacao.documento.id}',
             'status': anonimizacao.status,
+            'tipo_anonimizacao': 'ia',  # Por padrão assume IA
+            'total_substituicoes': len(items_data),
             'configuracao': {
-                'anonimizar_nomes': anonimizacao.anonimizar_nomes,
-                'anonimizar_cpf': anonimizacao.anonimizar_cpf,
-                'anonimizar_rg': anonimizacao.anonimizar_rg,
-                'anonimizar_enderecos': anonimizacao.anonimizar_enderecos,
-                'anonimizar_telefones': anonimizacao.anonimizar_telefones,
-                'anonimizar_emails': anonimizacao.anonimizar_emails,
+                'incluir_nomes': anonimizacao.anonimizar_nomes,
+                'incluir_cpf_rg': anonimizacao.anonimizar_cpf or anonimizacao.anonimizar_rg,
+                'incluir_enderecos': anonimizacao.anonimizar_enderecos,
+                'incluir_telefones': anonimizacao.anonimizar_telefones,
+                'incluir_emails': anonimizacao.anonimizar_emails,
             },
             'data_solicitacao': anonimizacao.data_solicitacao,
             'data_conclusao': anonimizacao.data_conclusao,
             'data_reversao': anonimizacao.data_reversao,
             'usuario_solicitante': anonimizacao.usuario.get_full_name() if anonimizacao.usuario else 'Sistema',
             'mensagem_erro': anonimizacao.mensagem_erro,
-            'itens_substituicao': items_data,
+            'itens': items_data,  # ✅ Mudado de itens_substituicao para itens
             'texto_preview': {
-                'original': anonimizacao.texto_original[:500] + '...' if len(anonimizacao.texto_original) > 500 else anonimizacao.texto_original,
-                'anonimizado': anonimizacao.texto_anonimizado[:500] + '...' if anonimizacao.texto_anonimizado and len(anonimizacao.texto_anonimizado) > 500 else anonimizacao.texto_anonimizado
+                'original': anonimizacao.texto_original,  # ✅ Texto completo para visualização
+                'anonimizado': anonimizacao.texto_anonimizado or ''  # ✅ Texto completo para visualização
             }
         }
         
@@ -272,4 +282,129 @@ def anonymization_details(request, anonimizacao_id):
         logger.error(f"❌ Erro ao buscar detalhes da anonimização: {str(e)}")
         return Response({
             'error': f'Erro ao buscar detalhes: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def delete_anonymization(request, anonimizacao_id):
+    """
+    Deleta um registro de anonimização e seus itens relacionados
+    """
+    try:
+        # Verificar se o usuário tem perfil e escritório
+        if not hasattr(request.user, 'perfil') or not request.user.perfil.escritorio:
+            return Response({
+                'error': 'Usuário não possui escritório associado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+            
+        anonimizacao = get_object_or_404(
+            DocumentoAnonimizacao.objects.select_related('documento'),
+            id=anonimizacao_id,
+            escritorio=request.user.perfil.escritorio
+        )
+        
+        documento_id = anonimizacao.documento.id
+        documento_titulo = anonimizacao.documento.titulo or f'Documento {documento_id}'
+        
+        # Deletar itens relacionados e a anonimização
+        with transaction.atomic():
+            # Os itens serão deletados automaticamente via CASCADE
+            anonimizacao.delete()
+            
+        logger.info(f"✅ Anonimização {anonimizacao_id} deletada com sucesso")
+        
+        return Response({
+            'success': True,
+            'message': f'Anonimização do documento "{documento_titulo}" deletada com sucesso.'
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao deletar anonimização: {str(e)}")
+        return Response({
+            'error': f'Erro ao deletar anonimização: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def deanonymize_text(request, anonimizacao_id):
+    """
+    Desanonimiza um texto usando o dicionário de substituições de uma anonimização.
+    
+    Este endpoint é útil para o fluxo:
+    1. Anonimizar petição inicial
+    2. Enviar texto anonimizado para ChatGPT
+    3. Receber contestação do ChatGPT (ainda com placeholders)
+    4. Usar este endpoint para desanonimizar a contestação
+    
+    Body esperado:
+    {
+        "texto_anonimizado": "O NOME1 com CPF CPF1 requer..."
+    }
+    
+    Response:
+    {
+        "success": true,
+        "texto_desanonimizado": "O João Silva com CPF 123.456.789-00 requer...",
+        "total_substituicoes": 5,
+        "anonimizacao_id": 123
+    }
+    """
+    try:
+        # Verificar se o usuário tem perfil e escritório
+        if not hasattr(request.user, 'perfil') or not request.user.perfil.escritorio:
+            return Response({
+                'error': 'Usuário não possui escritório associado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar anonimização existe e pertence ao escritório
+        anonimizacao = get_object_or_404(
+            DocumentoAnonimizacao,
+            id=anonimizacao_id,
+            escritorio=request.user.perfil.escritorio
+        )
+        
+        # Validar que a anonimização está concluída
+        if anonimizacao.status != 'concluido':
+            return Response({
+                'error': 'A anonimização precisa estar concluída para ser usada na desanonimização',
+                'status_atual': anonimizacao.status
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Obter texto anonimizado do body
+        texto_anonimizado = request.data.get('texto_anonimizado', '').strip()
+        
+        if not texto_anonimizado:
+            return Response({
+                'error': 'Campo "texto_anonimizado" é obrigatório'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Processar desanonimização
+        service = AnonymizationService()
+        texto_desanonimizado, total_substituicoes = service.deanonymize_text(
+            texto_anonimizado, 
+            anonimizacao_id
+        )
+        
+        logger.info(f"✅ Texto desanonimizado com sucesso usando anonimização #{anonimizacao_id}")
+        logger.info(f"📊 Total de substituições: {total_substituicoes}")
+        
+        return Response({
+            'success': True,
+            'texto_desanonimizado': texto_desanonimizado,
+            'total_substituicoes': total_substituicoes,
+            'anonimizacao_id': anonimizacao_id,
+            'documento': {
+                'id': anonimizacao.documento.id,
+                'titulo': anonimizacao.documento.titulo
+            }
+        }, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"❌ Erro ao desanonimizar texto: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return Response({
+            'error': f'Erro ao desanonimizar texto: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
