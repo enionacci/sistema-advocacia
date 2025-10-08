@@ -27,7 +27,7 @@ if platform.system() == 'Windows':
     for path in possible_paths:
         if os.path.exists(path):
             pytesseract.pytesseract.tesseract_cmd = path
-            print(f"✅ Tesseract encontrado em: {path}")
+            # print(f"✅ Tesseract encontrado em: {path}"))
             break
     else:
         print("⚠️ Tesseract não encontrado. Instale em: https://github.com/UB-Mannheim/tesseract/wiki")
@@ -44,7 +44,7 @@ if platform.system() == 'Windows':
     for path in possible_poppler_paths:
         if os.path.exists(path):
             POPPLER_PATH = path
-            print(f"✅ Poppler encontrado em: {path}")
+            # print(f"✅ Poppler encontrado em: {path}"))
             break
     else:
         print("⚠️ Poppler não encontrado. PDFs não serão suportados para OCR.")

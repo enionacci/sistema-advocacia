@@ -70,7 +70,7 @@ const Layout = ({ children }) => {
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [clientesOpen, setClientesOpen] = useState(false);
   const [auditoriaOpen, setAuditoriaOpen] = useState(false);
-  const [documentosOpen, setDocumentosOpen] = useState(false);
+  const [arquivosOpen, setArquivosOpen] = useState(false);
 
   // Handlers
   const handleDrawerToggle = () => {
@@ -131,45 +131,45 @@ const Layout = ({ children }) => {
       ],
     },
     {
-      id: 'documentos',
-      label: 'Documentos',
+      id: 'arquivos',
+      label: 'Arquivos',
       icon: <DocumentIcon />,
-      permission: 'ver_documento',
+      permission: 'ver_arquivos',
       submenu: [
         {
           id: 'scanner',
-          label: 'Escanear Documentos',
+          label: 'Escanear Arquivo',
           icon: <ScannerIcon />,
           path: '/scanner',
-          permission: 'criar_documento',
+          permission: 'escanear_arquivo',
         },
         {
           id: 'anonimizar',
           label: 'Anonimizar Dados',
           icon: <SecurityIcon />,
           path: '/anonimizar',
-          permission: 'ver_documento',
+          permission: 'anonimizar_arquivo',
         },
         {
           id: 'analise-ia',
           label: 'Análise com IA',
           icon: <AIIcon />,
           path: '/analise-ia',
-          permission: 'ver_documento',
+          permission: 'analisar_arquivo_ia',
         },
         {
           id: 'documentos-listar',
-          label: 'Documentos Salvos',
+          label: 'Arquivos Salvos',
           icon: <ListIcon />,
           path: '/documentos',
-          permission: 'ver_documento',
+          permission: 'ver_arquivos',
         },
         {
           id: 'analises-listar',
           label: 'Análises Realizadas',
           icon: <AIIcon />,
           path: '/analises',
-          permission: 'ver_documento',
+          permission: 'ver_arquivos',
         },
       ],
     },
@@ -253,11 +253,11 @@ const Layout = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {location.pathname === '/' && 'Clientes'}
             {location.pathname === '/clientes/novo' && 'Novo Cliente'}
-            {location.pathname === '/scanner' && 'Documentos - Escanear'}
-            {location.pathname === '/anonimizar' && 'Documentos - Anonimizar'}
-            {location.pathname === '/analise-ia' && 'Documentos - Análise IA'}
-            {location.pathname === '/documentos' && 'Documentos - Salvos'}
-            {location.pathname === '/analises' && 'Documentos - Análises'}
+            {location.pathname === '/scanner' && 'Arquivos - Escanear'}
+            {location.pathname === '/anonimizar' && 'Arquivos - Anonimizar'}
+            {location.pathname === '/analise-ia' && 'Arquivos - Análise IA'}
+            {location.pathname === '/documentos' && 'Arquivos - Salvos'}
+            {location.pathname === '/analises' && 'Arquivos - Análises'}
             {location.pathname.startsWith('/audit-logs') && 'Auditoria'}
             {location.pathname === '/meu-escritorio' && 'Meu Escritório'}
           </Typography>
@@ -378,7 +378,7 @@ const Layout = ({ children }) => {
                     <ListItemButton
                       onClick={() => {
                         if (item.id === 'clientes') setClientesOpen(!clientesOpen);
-                        if (item.id === 'documentos') setDocumentosOpen(!documentosOpen);
+                        if (item.id === 'arquivos') setArquivosOpen(!arquivosOpen);
                         if (item.id === 'auditoria') setAuditoriaOpen(!auditoriaOpen);
                       }}
                       selected={isParentActive(item.submenu.map(sub => sub.path))}
@@ -390,7 +390,7 @@ const Layout = ({ children }) => {
                       <ListItemIcon>{item.icon}</ListItemIcon>
                       <ListItemText primary={item.label} />
                       {(item.id === 'clientes' && clientesOpen) ||
-                       (item.id === 'documentos' && documentosOpen) ||
+                       (item.id === 'arquivos' && arquivosOpen) ||
                        (item.id === 'auditoria' && auditoriaOpen) ? (
                         <ExpandLess />
                       ) : (
@@ -401,7 +401,7 @@ const Layout = ({ children }) => {
                     <Collapse
                       in={
                         (item.id === 'clientes' && clientesOpen) ||
-                        (item.id === 'documentos' && documentosOpen) ||
+                        (item.id === 'arquivos' && arquivosOpen) ||
                         (item.id === 'auditoria' && auditoriaOpen)
                       }
                       timeout="auto"
