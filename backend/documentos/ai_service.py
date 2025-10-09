@@ -67,79 +67,78 @@ class OCRService:
     @staticmethod
     def extract_text_from_pdf(arquivo_bytes: bytes, task_id: str = None) -> str:
         """
-        Extrai texto de um PDF usando OCR com rastreamento de progresso
-        
-        Args:
-            arquivo_bytes: Bytes do arquivo PDF
-            task_id: ID da tarefa para rastreamento de progresso
-            
-        Returns:
-            Texto extraído do PDF
+        Extrai texto de um PDF, tentando primeiro a extração direta e, se não houver
+        texto, usa OCR.
         """
-        # Gera ID único se não fornecido
+        from pypdf import PdfReader
+
         if not task_id:
             task_id = str(uuid.uuid4())
-        
+
         try:
-            # Inicia rastreamento de progresso
-            progress_tracker.start_progress(task_id, 0)
-            
-            # Verifica se Poppler está disponível
-            if platform.system() == 'Windows' and not POPPLER_PATH:
-                progress_tracker.complete_progress(task_id, False, "Poppler não está configurado")
-                raise Exception("Poppler não está configurado. PDFs não são suportados no momento.")
-            
-            progress_tracker.update_progress(task_id, 0, "Convertendo PDF para imagens...")
-            
-            # Converte PDF para imagens
-            if POPPLER_PATH:
-                # Windows com caminho específico
-                images = convert_from_bytes(
-                    arquivo_bytes,
-                    dpi=300,  # Alta resolução para melhor OCR
-                    fmt='png',
-                    poppler_path=POPPLER_PATH
-                )
-            else:
-                # Linux com PATH padrão
-                images = convert_from_bytes(
-                    arquivo_bytes,
-                    dpi=300,  # Alta resolução para melhor OCR
-                    fmt='png'
-                )
-            
-            total_paginas = len(images)
-            progress_tracker.set_total_pages(task_id, total_paginas)
-            
+            # 1. Tenta extrair texto diretamente (para PDFs baseados em texto)
+            progress_tracker.update_progress(task_id, 0, "Tentando extração direta de texto...")
+            pdf_reader = PdfReader(io.BytesIO(arquivo_bytes))
             texto_completo = []
-            
-            # Faz OCR em cada página
+            total_paginas_texto = len(pdf_reader.pages)
+            progress_tracker.set_total_pages(task_id, total_paginas_texto)
+
+            for i, page in enumerate(pdf_reader.pages):
+                texto_pagina = page.extract_text()
+                if texto_pagina and texto_pagina.strip():
+                    texto_completo.append(f"--- Página {i + 1} ---\n{texto_pagina}")
+                progress_tracker.update_progress(task_id, i + 1)
+
+            texto_final = "\n\n".join(texto_completo)
+
+            # Se encontrou texto substancial, retorna
+            if texto_final.strip():
+                print("✅ PDF com texto. Extração direta concluída.")
+                progress_tracker.complete_progress(task_id, True)
+                return texto_final
+
+            # 2. Se não houver texto, parte para o OCR (para PDFs de imagem/escaneados)
+            print("⚠️ PDF sem texto detectado. Iniciando OCR...")
+            progress_tracker.update_progress(task_id, 0, "PDF sem texto, iniciando OCR...")
+
+            if platform.system() == 'Windows' and not POPPLER_PATH:
+                msg = "Poppler não configurado para OCR em PDF de imagem."
+                progress_tracker.complete_progress(task_id, False, msg)
+                raise Exception(msg)
+
+            progress_tracker.update_progress(task_id, 0, "Convertendo PDF para imagens...")
+            images = convert_from_bytes(
+                arquivo_bytes,
+                dpi=300,
+                fmt='png',
+                poppler_path=POPPLER_PATH if platform.system() == 'Windows' else None
+            )
+
+            total_paginas_ocr = len(images)
+            progress_tracker.set_total_pages(task_id, total_paginas_ocr)
+            texto_ocr = []
+
             for i, image in enumerate(images):
                 pagina_atual = i + 1
-                print(f"📄 Processando página {pagina_atual}/{total_paginas}...")
-                
-                # Atualiza progresso real
+                print(f"📄 Processando OCR da página {pagina_atual}/{total_paginas_ocr}...")
                 progress_tracker.update_progress(task_id, pagina_atual)
                 
-                # Extrai texto da imagem
-                texto = pytesseract.image_to_string(
-                    image,
-                    lang='por',  # Português
-                    config='--psm 6'  # Assume um bloco uniforme de texto
-                )
-                
+                texto = pytesseract.image_to_string(image, lang='por', config='--psm 6')
                 if texto.strip():
-                    texto_completo.append(f"--- Página {i + 1} ---\n{texto}")
-            
-            # Marca como concluído
-            texto_final = "\n\n".join(texto_completo)
+                    texto_ocr.append(f"--- Página {i + 1} ---\n{texto}")
+
+            texto_final_ocr = "\n\n".join(texto_ocr)
             progress_tracker.complete_progress(task_id, True)
-            
-            return texto_final
-            
+            return texto_final_ocr
+
         except Exception as e:
-            progress_tracker.complete_progress(task_id, False, f"Erro: {str(e)}")
-            raise Exception(f"Erro ao extrair texto do PDF: {str(e)}")
+            error_message = f"Erro ao extrair texto do PDF: {str(e)}"
+            progress_tracker.complete_progress(task_id, False, error_message)
+            # Adiciona log do erro no console para depuração
+            print(f"❌ {error_message}")
+            # Relança a exceção para que a view possa capturá-la
+            raise Exception(error_message)
+
     
     @staticmethod
     def extract_text_from_image(arquivo_bytes: bytes) -> str:

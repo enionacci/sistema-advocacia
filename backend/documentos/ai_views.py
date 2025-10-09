@@ -56,6 +56,9 @@ class DocumentoOCRAsyncView(views.APIView):
             # Gera ID único para a tarefa
             task_id = str(uuid.uuid4())
             
+            # Inicia o rastreamento do progresso imediatamente para evitar race condition
+            progress_tracker.start_progress(task_id)
+            
             # Salva arquivo temporariamente (compatível com Windows)
             temp_dir = tempfile.gettempdir()
             temp_path = os.path.join(temp_dir, f'{task_id}_{arquivo.name}')
