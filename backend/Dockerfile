@@ -43,6 +43,9 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
+# Baixar modelo de linguagem do spaCy para português
+RUN python -m spacy download pt_core_news_lg
+
 # Copiar código da aplicação
 COPY . .
 
@@ -57,6 +60,7 @@ EXPOSE 8000
 
 # Script de entrada (entrypoint)
 COPY docker-entrypoint.sh /docker-entrypoint.sh
+RUN sed -i 's/\r$//g' /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 ENTRYPOINT ["/docker-entrypoint.sh"]

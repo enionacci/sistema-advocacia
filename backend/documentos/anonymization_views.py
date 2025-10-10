@@ -66,9 +66,8 @@ def anonymize_document(request, documento_id):
                 anonimizar_emails=incluir_emails
             )
             
-            # Processar anonimização usando o método completo do serviço
-            use_ai = (tipo_anonimizacao == 'ia')
-            sucesso = service.anonymize_document(anonimizacao, use_ai=use_ai)
+            # Processar anonimização
+            sucesso = service.anonymize_document(anonimizacao)
             
             if not sucesso:
                 return Response({
@@ -82,10 +81,10 @@ def anonymize_document(request, documento_id):
             
             return Response({
                 'success': True,
-                'message': f'Documento anonimizado com sucesso usando {"IA Hugging Face" if use_ai else "Regex"}. {total_substituicoes} substituições realizadas.',
+                'message': f'Documento anonimizado com sucesso usando o motor Presidio. {total_substituicoes} substituições realizadas.',
                 'anonimizacao_id': anonimizacao.id,
                 'total_substituicoes': total_substituicoes,
-                'metodo': 'IA Hugging Face' if use_ai else 'Regex',
+                'metodo': 'Presidio (spaCy + Regex)',
                 'configuracao': configuracao
             }, status=status.HTTP_200_OK)
     

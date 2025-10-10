@@ -72,7 +72,7 @@ const AnonymizePage = () => {
   const [textoDesanonimizado, setTextoDesanonimizado] = useState('');
   const [anonimizacaoSelecionadaDeanon, setAnonimizacaoSelecionadaDeanon] = useState(null);
   
-  // Estados da configuração de anonimização - SEMPRE USA IA HUGGING FACE
+  // Estados da configuração de anonimização
   const [tipoAnonimizacao, setTipoAnonimizacao] = useState('ia');
   const [incluirNomes, setIncluirNomes] = useState(true);
   const [incluirEnderecos, setIncluirEnderecos] = useState(true);
@@ -452,6 +452,15 @@ const AnonymizePage = () => {
                               >
                                 Detalhes
                               </Button>
+                              <Button
+                                variant="outlined"
+                                onClick={() => deleteAnonymization(anon.id)}
+                                startIcon={<DeleteIcon />}
+                                size="small"
+                                color="error"
+                              >
+                                Deletar
+                              </Button>
                             </Box>
                           </ListItem>
                           {index < anonimizacoes.length - 1 && <Divider />}
@@ -527,23 +536,36 @@ const AnonymizePage = () => {
           <Grid container spacing={3}>
             <Grid item xs={12}>
               <Alert severity="info" sx={{ mb: 2 }}>
-                <AlertTitle>Anonimização com IA (Hugging Face)</AlertTitle>
-                Usando modelo GPT-OSS 120B para detectar e anonimizar automaticamente todos os dados pessoais:
-                Nomes, CPFs, RGs, Endereços, Telefones e E-mails.
+                <AlertTitle>Anonimização Avançada (spaCy + Regex)</AlertTitle>
+                Usando um modelo de linguagem local (spaCy) e expressões regulares (Regex) para detectar e anonimizar dados pessoais.
               </Alert>
             </Grid>
 
             <Grid item xs={12}>
               <Typography variant="subtitle2" gutterBottom>
-                Tipos de Dados que serão Anonimizados:
+                Selecione os tipos de dados para anonimizar:
               </Typography>
-              
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                <Chip label="✓ Nomes" color="primary" />
-                <Chip label="✓ CPF e RG" color="primary" />
-                <Chip label="✓ Endereços" color="primary" />
-                <Chip label="✓ E-mails" color="primary" />
-                <Chip label="✓ Telefones" color="primary" />
+              <Box>
+                <FormControlLabel
+                  control={<Switch checked={incluirNomes} onChange={(e) => setIncluirNomes(e.target.checked)} />}
+                  label="Nomes, Pessoas e Organizações"
+                />
+                <FormControlLabel
+                  control={<Switch checked={incluirCpfRg} onChange={(e) => setIncluirCpfRg(e.target.checked)} />}
+                  label="CPF e RG"
+                />
+                <FormControlLabel
+                  control={<Switch checked={incluirEnderecos} onChange={(e) => setIncluirEnderecos(e.target.checked)} />}
+                  label="Endereços e Locais"
+                />
+                <FormControlLabel
+                  control={<Switch checked={incluirEmails} onChange={(e) => setIncluirEmails(e.target.checked)} />}
+                  label="E-mails"
+                />
+                <FormControlLabel
+                  control={<Switch checked={incluirTelefones} onChange={(e) => setIncluirTelefones(e.target.checked)} />}
+                  label="Telefones"
+                />
               </Box>
             </Grid>
           </Grid>
