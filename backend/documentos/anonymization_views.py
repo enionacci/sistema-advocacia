@@ -407,3 +407,264 @@ def deanonymize_text(request, anonimizacao_id):
         return Response({
             'error': f'Erro ao desanonimizar texto: {str(e)}'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+# =====================================
+# ANONIMIZAÇÃO MANUAL - NOVAS APIs
+# =====================================
+
+from .anonymization_service import ManualAnonymizationService
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def manual_anonymize(request):
+    """
+    API para anonimização manual de texto selecionado pelo usuário.
+    
+    Body esperado:
+    {
+        "anonimizacao_id": 123,
+        "texto_selecionado": "João Silva",
+        "tipo": "nome"  // opcional, será auto-detectado se não fornecido
+    }
+    """
+    try:
+        # Verificar se o usuário tem perfil e escritório
+        if not hasattr(request.user, 'perfil') or not request.user.perfil.escritorio:
+            return Response({
+                'error': 'Usuário não possui escritório associado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar dados obrigatórios
+        anonimizacao_id = request.data.get('anonimizacao_id')
+        texto_selecionado = request.data.get('texto_selecionado')
+        tipo_sugerido = request.data.get('tipo')
+        
+        if not anonimizacao_id:
+            return Response({
+                'error': 'Campo "anonimizacao_id" é obrigatório'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not texto_selecionado:
+            return Response({
+                'error': 'Campo "texto_selecionado" é obrigatório'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar se a anonimização pertence ao escritório do usuário
+        anonimizacao = get_object_or_404(
+            DocumentoAnonimizacao,
+            id=anonimizacao_id,
+            escritorio=request.user.perfil.escritorio
+        )
+        
+        # Verificar se a anonimização está em status válido
+        if anonimizacao.status not in ['concluido']:
+            return Response({
+                'error': f'Anonimização deve estar concluída. Status atual: {anonimizacao.status}'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Processar anonimização manual
+        service = ManualAnonymizationService()
+        resultado = service.anonymize_selected_text(
+            anonimizacao_id=anonimizacao_id,
+            texto_selecionado=texto_selecionado,
+            tipo_sugerido=tipo_sugerido
+        )
+        
+        if resultado['success']:
+            logger.info(f"✅ Anonimização manual bem-sucedida: {texto_selecionado} → {resultado['placeholder']}")
+            return Response(resultado, status=status.HTTP_200_OK)
+        else:
+            logger.warning(f"⚠️ Erro na anonimização manual: {resultado['error']}")
+            return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"❌ Erro na API de anonimização manual: {e}", exc_info=True)
+        return Response({
+            'success': False,
+            'error': f'Erro interno do servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def undo_manual_anonymize(request):
+    """
+    API para desfazer uma anonimização manual específica.
+    
+    Body esperado:
+    {
+        "anonimizacao_id": 123,
+        "item_id": 456
+    }
+    """
+    try:
+        # Verificar se o usuário tem perfil e escritório
+        if not hasattr(request.user, 'perfil') or not request.user.perfil.escritorio:
+            return Response({
+                'error': 'Usuário não possui escritório associado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Validar dados obrigatórios
+        anonimizacao_id = request.data.get('anonimizacao_id')
+        item_id = request.data.get('item_id')
+        
+        if not anonimizacao_id or not item_id:
+            return Response({
+                'error': 'Campos "anonimizacao_id" e "item_id" são obrigatórios'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar se a anonimização pertence ao escritório do usuário
+        anonimizacao = get_object_or_404(
+            DocumentoAnonimizacao,
+            id=anonimizacao_id,
+            escritorio=request.user.perfil.escritorio
+        )
+        
+        # Processar desfazer anonimização
+        service = ManualAnonymizationService()
+        resultado = service.undo_manual_anonymization(
+            anonimizacao_id=anonimizacao_id,
+            item_id=item_id
+        )
+        
+        if resultado['success']:
+            logger.info(f"↩️ Anonimização manual desfeita: {resultado['placeholder_removido']} → {resultado['valor_restaurado']}")
+            return Response(resultado, status=status.HTTP_200_OK)
+        else:
+            logger.warning(f"⚠️ Erro ao desfazer anonimização manual: {resultado['error']}")
+            return Response(resultado, status=status.HTTP_400_BAD_REQUEST)
+    
+    except Exception as e:
+        logger.error(f"❌ Erro na API de desfazer anonimização: {e}", exc_info=True)
+        return Response({
+            'success': False,
+            'error': f'Erro interno do servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def suggest_type(request):
+    """
+    API para analisar texto selecionado e sugerir tipo de dado.
+    
+    Body esperado:
+    {
+        "texto_selecionado": "123.456.789-00"
+    }
+    """
+    try:
+        texto_selecionado = request.data.get('texto_selecionado', '').strip()
+        
+        if not texto_selecionado:
+            return Response({
+                'success': False,
+                'error': 'Campo "texto_selecionado" é obrigatório'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Analisar texto e sugerir tipo
+        service = ManualAnonymizationService()
+        sugestoes = service.get_suggestions_for_selection(texto_selecionado)
+        
+        return Response({
+            'success': True,
+            'texto_analisado': texto_selecionado,
+            'sugestoes': sugestoes
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"❌ Erro na API de sugestão de tipo: {e}")
+        return Response({
+            'success': False,
+            'error': f'Erro interno do servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def list_manual_anonymizations(request, anonimizacao_id):
+    """
+    API para listar todas as anonimizações manuais de um documento.
+    """
+    try:
+        # Verificar se o usuário tem perfil e escritório
+        if not hasattr(request.user, 'perfil') or not request.user.perfil.escritorio:
+            return Response({
+                'error': 'Usuário não possui escritório associado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar se a anonimização pertence ao escritório do usuário
+        anonimizacao = get_object_or_404(
+            DocumentoAnonimizacao,
+            id=anonimizacao_id,
+            escritorio=request.user.perfil.escritorio
+        )
+        
+        # Buscar anonimizações manuais
+        service = ManualAnonymizationService()
+        resultado = service.get_manual_anonymizations(anonimizacao_id)
+        
+        return Response(resultado, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"❌ Erro ao listar anonimizações manuais: {e}")
+        return Response({
+            'success': False,
+            'error': f'Erro interno do servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_updated_text(request, anonimizacao_id):
+    """
+    API para obter o texto atualizado após anonimizações manuais.
+    """
+    try:
+        # Verificar se o usuário tem perfil e escritório
+        if not hasattr(request.user, 'perfil') or not request.user.perfil.escritorio:
+            return Response({
+                'error': 'Usuário não possui escritório associado'
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        # Verificar se a anonimização pertence ao escritório do usuário
+        anonimizacao = get_object_or_404(
+            DocumentoAnonimizacao,
+            id=anonimizacao_id,
+            escritorio=request.user.perfil.escritorio
+        )
+        
+        # Contar estatísticas
+        total_automaticas = AnonimizacaoItem.objects.filter(
+            anonimizacao=anonimizacao,
+            anonimizado_manualmente=False
+        ).count()
+        
+        total_manuais = AnonimizacaoItem.objects.filter(
+            anonimizacao=anonimizacao,
+            anonimizado_manualmente=True
+        ).count()
+        
+        return Response({
+            'success': True,
+            'anonimizacao_id': anonimizacao_id,
+            'texto_original': anonimizacao.texto_original,
+            'texto_anonimizado': anonimizacao.texto_anonimizado,
+            'status': anonimizacao.status,
+            'estatisticas': {
+                'total_automaticas': total_automaticas,
+                'total_manuais': total_manuais,
+                'total_geral': total_automaticas + total_manuais
+            },
+            'documento': {
+                'id': anonimizacao.documento.id,
+                'titulo': anonimizacao.documento.titulo
+            }
+        }, status=status.HTTP_200_OK)
+    
+    except Exception as e:
+        logger.error(f"❌ Erro ao obter texto atualizado: {e}")
+        return Response({
+            'success': False,
+            'error': f'Erro interno do servidor: {str(e)}'
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

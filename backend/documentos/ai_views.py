@@ -75,7 +75,7 @@ class DocumentoOCRAsyncView(views.APIView):
                     texto_extraido = OCRService.extract_text(temp_path, tipo_arquivo, task_id)
                     print(f"✅ OCR concluído. Texto extraído: {len(texto_extraido)} caracteres")
                     
-                    # Salva resultado diretamente no tracker com mutexes
+                    # ✅ CORREÇÃO PRINCIPAL - COMPLETAR O PROGRESSO
                     with progress_tracker._lock:
                         if task_id in progress_tracker._progress_data:
                             progress_tracker._progress_data[task_id]['resultado'] = {
@@ -85,6 +85,10 @@ class DocumentoOCRAsyncView(views.APIView):
                                 'tamanho': arquivo.size
                             }
                             print(f"💾 Resultado salvo no tracker para task {task_id}")
+                    
+                    # 🚀 MARCAR COMO CONCLUÍDO
+                    progress_tracker.complete_progress(task_id, success=True, message="OCR concluído com sucesso!")
+                    print(f"✅ Progresso marcado como concluído para task {task_id}")
                     
                 except Exception as e:
                     print(f"❌ Erro no processamento OCR: {str(e)}")
@@ -113,14 +117,80 @@ class DocumentoOCRAsyncView(views.APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class DocumentoOCRWithMarginsView(views.APIView):
+    permission_classes = [HasPermission]
+    required_permission = 'escanear_documento'
+
+    def post(self, request):
+        if 'arquivo' not in request.FILES:
+            return Response({'error': 'Arquivo não fornecido'}, status=status.HTTP_400_BAD_REQUEST)
+        if 'margins' not in request.data:
+            return Response({'error': 'Margens não fornecidas'}, status=status.HTTP_400_BAD_REQUEST)
+
+        arquivo = request.FILES['arquivo']
+        try:
+            import json
+            margins = json.loads(request.data['margins'])
+        except (json.JSONDecodeError, TypeError):
+            return Response({'error': 'Formato das margens inválido'}, status=status.HTTP_400_BAD_REQUEST)
+
+        tipo_arquivo = os.path.splitext(arquivo.name)[1].lower().replace('.', '')
+        if tipo_arquivo != 'pdf':
+            return Response({'error': 'Seleção de margens só é suportada para arquivos PDF.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        task_id = str(uuid.uuid4())
+        progress_tracker.start_progress(task_id)
+
+        temp_dir = tempfile.gettempdir()
+        temp_path = os.path.join(temp_dir, f'{task_id}_{arquivo.name}')
+        with open(temp_path, 'wb+') as temp_file:
+            for chunk in arquivo.chunks():
+                temp_file.write(chunk)
+
+        def processar_ocr_margens():
+            try:
+                texto_extraido = OCRService.extract_text_with_margins(temp_path, task_id, margins)
+                print(f"✅ OCR com margens concluído: {len(texto_extraido)} caracteres")
+                
+                # ✅ CORREÇÃO PRINCIPAL - COMPLETAR O PROGRESSO
+                with progress_tracker._lock:
+                    if task_id in progress_tracker._progress_data:
+                        progress_tracker._progress_data[task_id]['resultado'] = {
+                            'texto': texto_extraido,
+                            'nome_arquivo': arquivo.name,
+                            'tipo_arquivo': tipo_arquivo,
+                            'tamanho': arquivo.size
+                        }
+                        print(f"💾 Resultado salvo no tracker para task {task_id}")
+                
+                # 🚀 MARCAR COMO CONCLUÍDO
+                progress_tracker.complete_progress(task_id, success=True, message="OCR concluído com sucesso!")
+                print(f"✅ Progresso marcado como concluído para task {task_id}")
+                
+            except Exception as e:
+                print(f"❌ Erro no OCR com margens: {str(e)}")
+                progress_tracker.complete_progress(task_id, False, f"Erro: {str(e)}")
+            finally:
+                if os.path.exists(temp_path):
+                    os.remove(temp_path)
+
+        thread = threading.Thread(target=processar_ocr_margens)
+        thread.daemon = True
+        thread.start()
+
+        return Response({
+            'success': True,
+            'task_id': task_id,
+            'message': 'Processamento com margens iniciado. Use o task_id para acompanhar.'
+        }, status=status.HTTP_202_ACCEPTED)
 
 class DocumentoOCRProgressView(views.APIView):
     """
     View para consultar progresso de processamento OCR
     GET: Retorna status atual do processamento
     """
-    permission_classes = [HasPermission]
-    required_permission = 'escanear_documento'
+#    permission_classes = [HasPermission]
+#   required_permission = 'criar_documento'
     
     def get(self, request, task_id):
         """
@@ -129,11 +199,16 @@ class DocumentoOCRProgressView(views.APIView):
         try:
             progress_data = progress_tracker.get_progress(task_id)
             
+            # ✅ DEBUG DETALHADO
+            print(f"🔍 RECEBIDO do tracker para {task_id}: {progress_data}")
+            
             if not progress_data:
-                return Response(
-                    {'error': 'Tarefa não encontrada ou expirada'},
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                print(f"❌ Task {task_id} não encontrada no tracker")
+                return Response({
+                    'error': 'Tarefa não encontrada ou expirada',
+                    'task_id': task_id,
+                    'status': 'not_found'
+                }, status=status.HTTP_404_NOT_FOUND)
             
             # Se concluído com sucesso, inclui o resultado
             response_data = {
@@ -146,18 +221,25 @@ class DocumentoOCRProgressView(views.APIView):
                 'elapsed_seconds': progress_data['elapsed_seconds']
             }
             
-            # Se concluído com sucesso, inclui resultado
+            # ✅ VERIFICAR SE TEM RESULTADO
             if progress_data['status'] == 'concluido' and 'resultado' in progress_data:
                 response_data['resultado'] = progress_data['resultado']
-                print(f"📤 Enviando resultado para frontend - task {task_id}: {len(progress_data['resultado'].get('texto', ''))} chars")
+                print(f"📤 INCLUINDO resultado na resposta: {len(str(progress_data['resultado']))}")
+                print(f"📤 Texto extraído: {len(progress_data['resultado'].get('texto', ''))} chars")
+            else:
+                print(f"❌ SEM resultado - status: {progress_data['status']}, tem resultado: {'resultado' in progress_data}")
             
+            print(f"📤 ENVIANDO resposta: {len(str(response_data))} chars, status: {response_data['status']}")
             return Response(response_data, status=status.HTTP_200_OK)
             
         except Exception as e:
-            return Response(
-                {'error': f'Erro ao consultar progresso: {str(e)}'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            print(f"❌ ERRO na DocumentoOCRProgressView: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+            return Response({
+                'error': f'Erro ao consultar progresso: {str(e)}',
+                'task_id': task_id
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 

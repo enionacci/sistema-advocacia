@@ -33,6 +33,7 @@ class ProgressTracker:
                 'last_update': datetime.now(),
                 'message': 'Iniciando processamento...'
             }
+            print(f"🏁 Progresso iniciado para {task_id}")
     
     def update_progress(self, task_id: str, current_page: int, message: str = None) -> None:
         """
@@ -54,6 +55,8 @@ class ProgressTracker:
                 else:
                     total = self._progress_data[task_id]['total_pages']
                     self._progress_data[task_id]['message'] = f'Processando página {current_page}/{total}...'
+                
+                print(f"📈 Progresso atualizado para {task_id}: {current_page}/{self._progress_data[task_id]['total_pages']}")
     
     def set_total_pages(self, task_id: str, total_pages: int) -> None:
         """
@@ -66,6 +69,7 @@ class ProgressTracker:
         with self._lock:
             if task_id in self._progress_data:
                 self._progress_data[task_id]['total_pages'] = total_pages
+                print(f"📊 Total de páginas definido para {task_id}: {total_pages}")
     
     def complete_progress(self, task_id: str, success: bool = True, message: str = None) -> None:
         """
@@ -81,11 +85,19 @@ class ProgressTracker:
                 self._progress_data[task_id]['status'] = 'concluido' if success else 'erro'
                 self._progress_data[task_id]['last_update'] = datetime.now()
                 
+                # ✅ IMPORTANTE - Marcar como 100% quando concluído
+                if success:
+                    self._progress_data[task_id]['current_page'] = self._progress_data[task_id]['total_pages']
+                
                 if message:
                     self._progress_data[task_id]['message'] = message
                 elif success:
                     total = self._progress_data[task_id]['total_pages']
                     self._progress_data[task_id]['message'] = f'Processamento concluído! {total} páginas processadas.'
+                
+                # ✅ DEBUG - Log para verificar
+                print(f"🏁 Progress marcado como concluído para {task_id}: {self._progress_data[task_id]['status']}")
+                print(f"🔍 Dados completos: {self._progress_data[task_id]}")
     
     def get_progress(self, task_id: str) -> Optional[Dict]:
         """
@@ -105,15 +117,28 @@ class ProgressTracker:
                 if progress['total_pages'] > 0:
                     progress['percentage'] = (progress['current_page'] / progress['total_pages']) * 100
                 else:
-                    progress['percentage'] = 0
+                    # Se não tem páginas definidas, mas está concluído, é 100%
+                    if progress['status'] == 'concluido':
+                        progress['percentage'] = 100
+                    else:
+                        progress['percentage'] = 0
                 
                 # Calcula tempo decorrido
                 elapsed = datetime.now() - progress['start_time']
                 progress['elapsed_seconds'] = elapsed.total_seconds()
                 
+                # ✅ DEBUG - Log da consulta
+                print(f"📋 Consultando progresso {task_id}: {progress['status']} - {progress['percentage']}%")
+                
                 return progress
             
+            print(f"❌ Task {task_id} não encontrada no tracker")
             return None
+    
+    def get_all_progress(self) -> Dict:
+        """Debug - retorna todos os dados de progresso"""
+        with self._lock:
+            return {k: v.copy() for k, v in self._progress_data.items()}
     
     def cleanup_progress(self, task_id: str) -> None:
         """
@@ -125,6 +150,7 @@ class ProgressTracker:
         with self._lock:
             if task_id in self._progress_data:
                 del self._progress_data[task_id]
+                print(f"🗑️ Progress removido para {task_id}")
     
     def cleanup_old_progress(self, max_age_hours: int = 1) -> None:
         """
@@ -144,6 +170,7 @@ class ProgressTracker:
             
             for task_id in expired_tasks:
                 del self._progress_data[task_id]
+                print(f"🕐 Progress expirado removido: {task_id}")
 
 
 # Instância global do rastreador de progresso

@@ -641,6 +641,12 @@ class AnonimizacaoItem(models.Model):
         help_text='Placeholder usado na substituição (ex: NOME1, CPF1)'
     )
     
+    anonimizado_manualmente = models.BooleanField(
+        default=False,
+        verbose_name='Anonimizado Manualmente',
+        help_text='Indica se foi anonimizado manualmente pelo usuário'
+    )
+
     # Metadados para localização
     posicao_inicio = models.IntegerField(
         null=True,

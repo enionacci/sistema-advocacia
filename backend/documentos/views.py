@@ -8,15 +8,25 @@ Endpoints:
 - /api/documentos/{id}/download/ - Download do arquivo
 - /api/documentos/{id}/incrementar-visualizacao/ - Incrementa contador
 - /api/clientes/{id}/documentos/ - Documentos de um cliente específico
+- /api/documentos/salvar-scanner/ - Salvar documento do scanner (NOVO)
+- /api/documentos/ocr/ - Processar OCR
+- /api/documentos/ocr-progress/{task_id}/ - Consultar progresso OCR
 """
 
 from rest_framework import viewsets, status, filters
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, JsonResponse
 from django.db.models import Q
+from django.utils import timezone
+from django.core.cache import cache
+import os
+import traceback
+import uuid
+
 from .models import Categoria, Tag, Documento
 from .serializers import (
     CategoriaSerializer, TagSerializer,
@@ -215,3 +225,213 @@ class DocumentoViewSet(viewsets.ModelViewSet):
                 return f"{size:.1f} {unit}"
             size /= 1024.0
         return f"{size:.1f} TB"
+
+
+# ========================================
+# VIEWS PARA OCR E PROGRESSO
+# ========================================
+
+class OCRProgressView(APIView):
+    """
+    View para consultar o progresso do processamento OCR
+    GET /api/documentos/ocr-progress/{task_id}/
+    """
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, task_id):
+        try:
+            # Tentar buscar o progresso no cache/sessão
+            progress_key = f"ocr_progress_{task_id}"
+            progress_data = cache.get(progress_key)
+            
+            if progress_data:
+                return Response(progress_data)
+            else:
+                # Se não encontrou, pode ser que já terminou ou task_id inválido
+                return Response({
+                    'task_id': task_id,
+                    'status': 'completed',  # ou 'not_found'
+                    'progress': 100,
+                    'message': 'Processamento concluído ou não encontrado'
+                })
+                
+        except Exception as e:
+            return Response({
+                'error': str(e),
+                'status': 'failed',
+                'task_id': task_id
+            }, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def processar_ocr(request):
+    """
+    Endpoint para iniciar processamento OCR
+    POST /api/documentos/ocr/
+    """
+    try:
+        # Gerar um task_id único
+        task_id = str(uuid.uuid4())
+        
+        # Simular progresso inicial
+        progress_data = {
+            'task_id': task_id,
+            'status': 'processing',
+            'progress': 10,
+            'message': 'Iniciando processamento OCR...'
+        }
+        
+        # Salvar no cache por 30 minutos
+        cache.set(f"ocr_progress_{task_id}", progress_data, 1800)
+        
+        # Aqui você pode iniciar uma task assíncrona (Celery, etc.)
+        # Por enquanto, vamos simular um processamento
+        
+        return Response({
+            'task_id': task_id,
+            'message': 'OCR iniciado com sucesso',
+            'status': 'started'
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': str(e),
+            'status': 'failed'
+        }, status=500)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def simular_progresso_ocr(request, task_id):
+    """
+    Endpoint para simular atualização de progresso (para desenvolvimento)
+    POST /api/documentos/ocr-progress/{task_id}/update/
+    """
+    try:
+        progress = request.data.get('progress', 50)
+        status_value = request.data.get('status', 'processing')
+        message = request.data.get('message', 'Processando...')
+        
+        progress_data = {
+            'task_id': task_id,
+            'status': status_value,
+            'progress': int(progress),
+            'message': message
+        }
+        
+        # Atualizar no cache
+        cache.set(f"ocr_progress_{task_id}", progress_data, 1800)
+        
+        return Response({
+            'success': True,
+            'progress_data': progress_data
+        })
+        
+    except Exception as e:
+        return Response({
+            'error': str(e)
+        }, status=500)
+
+
+# ========================================
+# ENDPOINT ESPECÍFICO PARA SCANNER - NOVO
+# ========================================
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def salvar_documento_scanner(request):
+    """
+    Endpoint específico para salvar documentos do scanner
+    Bypassa o problema do perfil/escritório
+    """
+    try:
+        titulo = request.data.get('titulo')
+        texto_extraido = request.data.get('texto_extraido')
+        cliente_id = request.data.get('cliente_id')
+        nome_arquivo_original = request.data.get('nome_arquivo_original', '')
+        
+        # Validações
+        if not titulo:
+            return JsonResponse({'error': 'Título é obrigatório'}, status=400)
+            
+        if not texto_extraido:
+            return JsonResponse({'error': 'Texto extraído é obrigatório'}, status=400)
+        
+        # Calcular tamanho
+        tamanho = len(texto_extraido.encode('utf-8'))
+        
+        # ✅ RESOLVER ESCRITÓRIO - MÚLTIPLAS ESTRATÉGIAS
+        escritorio = None
+        
+        # Estratégia 1: Tentar pelo perfil do usuário
+        try:
+            if hasattr(request.user, 'perfil') and request.user.perfil and hasattr(request.user.perfil, 'escritorio'):
+                escritorio = request.user.perfil.escritorio
+        except Exception:
+            pass
+        
+        # Estratégia 2: Pegar o primeiro escritório disponível
+        if not escritorio:
+            from escritorios.models import Escritorio
+            escritorio = Escritorio.objects.first()
+        
+        # Estratégia 3: Criar um escritório padrão se não existir nenhum
+        if not escritorio:
+            from escritorios.models import Escritorio
+            escritorio = Escritorio.objects.create(
+                nome='Escritório Principal',
+                ativo=True
+            )
+        
+        # Preparar dados do documento
+        documento_data = {
+            'escritorio': escritorio,
+            'titulo': titulo,
+            'texto_extraido': texto_extraido,
+            'tamanho': tamanho,
+            'tipo_arquivo': 'txt',
+            'nome_original': nome_arquivo_original or f"{titulo}.txt",
+            'data_upload': timezone.now(),
+            'usuario_upload': request.user,
+            'ativo': True,
+            'descricao': f'Documento digitalizado via scanner em {timezone.now().strftime("%d/%m/%Y %H:%M")}',
+            'versao': 1,
+            'visualizacoes': 0,
+            'downloads': 0,
+            'confidencial': False,
+            'hash_md5': '',  # Será calculado no save() se necessário
+        }
+        
+        # ✅ ADICIONAR CLIENTE SE FORNECIDO
+        if cliente_id:
+            try:
+                from clientes.models import Cliente
+                cliente = Cliente.objects.get(id=cliente_id, escritorio=escritorio)
+                documento_data['cliente'] = cliente
+            except Cliente.DoesNotExist:
+                return JsonResponse({
+                    'error': f'Cliente com ID {cliente_id} não encontrado no escritório'
+                }, status=400)
+        
+        # ✅ CRIAR DOCUMENTO
+        documento = Documento.objects.create(**documento_data)
+        
+        return JsonResponse({
+            'success': True,
+            'id': documento.id,
+            'titulo': documento.titulo,
+            'tamanho': documento.tamanho,
+            'escritorio': escritorio.nome,
+            'message': 'Documento salvo com sucesso via scanner'
+        })
+        
+    except Exception as e:
+        # Log detalhado do erro
+        print("❌ ERRO AO SALVAR DOCUMENTO SCANNER:")
+        print(traceback.format_exc())
+        
+        return JsonResponse({
+            'error': f'Erro interno do servidor: {str(e)}',
+            'type': type(e).__name__
+        }, status=500)

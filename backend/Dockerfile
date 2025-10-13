@@ -43,9 +43,6 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install -r requirements.txt
 
-# Baixar modelo de linguagem do spaCy para português
-RUN python -m spacy download pt_core_news_lg
-
 # Copiar código da aplicação
 COPY . .
 
@@ -64,4 +61,4 @@ RUN sed -i 's/\r$//g' /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "1"]

@@ -14,6 +14,7 @@ import pytesseract
 from pdf2image import convert_from_bytes
 from PIL import Image
 from openai import OpenAI
+import fitz
 from .progress_service import progress_tracker
 
 
@@ -139,7 +140,107 @@ class OCRService:
             # Relança a exceção para que a view possa capturá-la
             raise Exception(error_message)
 
+    @staticmethod
+    def extract_text_from_region(arquivo_path: str, tipo_arquivo: str, task_id: str, region: dict) -> str:
+        """
+        Extrai texto de uma região específica de uma página de um PDF.
+        """
+        if tipo_arquivo.lower() != 'pdf':
+            raise ValueError("A extração de região só é suportada para arquivos PDF.")
+
+        try:
+            progress_tracker.update_progress(task_id, 0, "Iniciando extração de região...")
+            
+            doc = fitz.open(arquivo_path)
+            
+            # Valida número da página
+            page_num = region.get('pageNumber', 1) - 1
+            if page_num < 0 or page_num >= doc.page_count:
+                raise ValueError(f"Número de página inválido: {page_num + 1}")
+            
+            page = doc.load_page(page_num)
+            
+            # Dimensões da página no PDF
+            pdf_page_rect = page.rect
+            pdf_width = pdf_page_rect.width
+            pdf_height = pdf_page_rect.height
+            
+            # Dimensões da página renderizada no frontend
+            frontend_width = region.get('pageWidth')
+            frontend_height = region.get('pageHeight')
+            
+            if not frontend_width or not frontend_height:
+                raise ValueError("Dimensões da página do frontend não fornecidas.")
+
+            # Escala as coordenadas do frontend para as do PDF
+            x1 = (region['x1'] / frontend_width) * pdf_width
+            y1 = (region['y1'] / frontend_height) * pdf_height
+            x2 = (region['x2'] / frontend_width) * pdf_width
+            y2 = (region['y2'] / frontend_height) * pdf_height
+            
+            # Cria o retângulo de corte (clip)
+            clip_rect = fitz.Rect(x1, y1, x2, y2)
+            
+            progress_tracker.update_progress(task_id, 50, "Extraindo texto da área selecionada...")
+            
+            text = page.get_text("text", clip=clip_rect)
+            
+            progress_tracker.complete_progress(task_id, True)
+            
+            print(f"✅ Texto extraído da região: {len(text)} caracteres")
+            return text
+
+        except Exception as e:
+            error_message = f"Erro ao extrair texto da região do PDF: {str(e)}"
+            progress_tracker.complete_progress(task_id, False, error_message)
+            print(f"❌ {error_message}")
+            raise Exception(error_message)
     
+    @staticmethod
+    def extract_text_with_margins(arquivo_path: str, task_id: str, margins: dict) -> str:
+        """
+        Extrai texto de todas as páginas de um PDF, aplicando margens percentuais
+        para ignorar cabeçalhos, rodapés e laterais.
+        """
+        try:
+            progress_tracker.update_progress(task_id, 0, "Iniciando extração com margens...")
+            
+            doc = fitz.open(arquivo_path)
+            progress_tracker.set_total_pages(task_id, doc.page_count)
+
+            textos_completos = []
+
+            for i in range(doc.page_count):
+                pagina_atual = i + 1
+                progress_tracker.update_progress(task_id, pagina_atual, f"Processando página {pagina_atual}/{doc.page_count}")
+                
+                page = doc.load_page(i)
+                pdf_page_rect = page.rect
+
+                # Converte margens percentuais para coordenadas absolutas da página
+                x1 = pdf_page_rect.width * (margins.get('left', 0) / 100)
+                y1 = pdf_page_rect.height * (margins.get('top', 0) / 100)
+                x2 = pdf_page_rect.width * (1 - (margins.get('right', 0) / 100))
+                y2 = pdf_page_rect.height * (1 - (margins.get('bottom', 0) / 100))
+
+                clip_rect = fitz.Rect(x1, y1, x2, y2)
+                
+                texto_pagina = page.get_text("text", clip=clip_rect)
+                if texto_pagina.strip():
+                    textos_completos.append(f"--- Página {pagina_atual} ---\n{texto_pagina}")
+
+            texto_final = "\n\n".join(textos_completos)
+            progress_tracker.complete_progress(task_id, True)
+            
+            print(f"✅ Texto extraído com margens: {len(texto_final)} caracteres")
+            return texto_final
+
+        except Exception as e:
+            error_message = f"Erro ao extrair texto com margens: {str(e)}"
+            progress_tracker.complete_progress(task_id, False, error_message)
+            print(f"❌ {error_message}")
+            raise Exception(error_message)
+
     @staticmethod
     def extract_text_from_image(arquivo_bytes: bytes) -> str:
         """
