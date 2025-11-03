@@ -32,9 +32,10 @@ import {
   FormControl,
   InputLabel,
   Select,
-  Tooltip
-} from '@mui/material';
-import {
+  Tooltip,
+  ToggleButton,
+  ToggleButtonGroup
+} from '@mui/material';import {
   Security as SecurityIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon,
@@ -747,9 +748,32 @@ const AnonymizePage = () => {
           
           <Grid container spacing={3}>
             <Grid item xs={12}>
+              <Typography variant="subtitle2" gutterBottom>
+                Método de Anonimização
+              </Typography>
+              <ToggleButtonGroup
+                color="primary"
+                value={tipoAnonimizacao}
+                exclusive
+                onChange={(event, newTipo) => {
+                  if (newTipo !== null) {
+                    setTipoAnonimizacao(newTipo);
+                  }
+                }}
+                aria-label="Método de Anonimização"
+              >
+                <ToggleButton value="regex" startIcon={<RegexIcon />}>
+                  Regex (Local)
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Grid>
+
+            <Grid item xs={12}>
               <Alert severity="info" sx={{ mb: 2 }}>
-                <AlertTitle>Anonimização Avançada (spaCy + Regex)</AlertTitle>
-                Usando um modelo de linguagem local (spaCy) e expressões regulares (Regex) para detectar e anonimizar dados pessoais.
+                <AlertTitle>
+                  {'Anonimização com Regex'}
+                </AlertTitle>
+                {'Usa expressões regulares locais para detectar e anonimizar dados. Rápido e funciona offline.'}
               </Alert>
             </Grid>
 

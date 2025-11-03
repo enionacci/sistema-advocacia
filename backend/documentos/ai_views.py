@@ -396,62 +396,79 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
     
     def create(self, request, *args, **kwargs):
         """
-        Cria uma análise de IA a partir de texto enviado
+        Cria uma análise de IA a partir de documento existente ou texto
         """
         from clientes.models import Cliente
         
+        documento_id = request.data.get('documento_id')
         texto = request.data.get('texto')
         tipo_analise = request.data.get('tipo_analise', 'resumo')
         prompt_personalizado = request.data.get('prompt_personalizado')
-        modelo_ia = request.data.get('modelo_ia', 'gpt-5-nano-2025-08-07')  # GPT-5 Nano como padrão
+        modelo_ia = request.data.get('modelo_ia', 'gpt-5-nano-2025-08-07')
         cliente_id = request.data.get('cliente_id')
-        
-        # Validações
-        if not texto:
-            return Response(
-                {'error': 'Texto é obrigatório'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        if tipo_analise == 'personalizado' and not prompt_personalizado:
-            return Response(
-                {'error': 'Prompt personalizado é obrigatório para análise personalizada'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
         
         # Obter dados do usuário autenticado
         usuario = request.user
         escritorio = usuario.perfil.escritorio
         
-        # Obter cliente
-        if cliente_id:
+        # Se foi fornecido documento_id, usa o documento existente
+        if documento_id:
             try:
-                cliente = Cliente.objects.get(id=cliente_id, escritorio=escritorio)
-            except Cliente.DoesNotExist:
+                documento = Documento.objects.get(
+                    id=documento_id, 
+                    escritorio=escritorio
+                )
+                print(f"✅ Usando documento existente: {documento.titulo} (ID: {documento.id})")
+            except Documento.DoesNotExist:
                 return Response(
-                    {'error': 'Cliente não encontrado'},
-                    status=status.HTTP_400_BAD_REQUEST
+                    {'error': 'Documento não encontrado'},
+                    status=status.HTTP_404_NOT_FOUND
                 )
         else:
-            # Se não foi informado cliente_id, pega o primeiro do escritório
-            cliente = Cliente.objects.filter(escritorio=escritorio).first()
-            if not cliente:
+            # Se não foi fornecido documento_id, cria um novo documento a partir do texto
+            if not texto:
                 return Response(
-                    {'error': 'Nenhum cliente encontrado no escritório. Por favor, cadastre um cliente primeiro.'},
+                    {'error': 'Texto ou documento_id é obrigatório'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Obter cliente
+            if cliente_id:
+                try:
+                    cliente = Cliente.objects.get(id=cliente_id, escritorio=escritorio)
+                except Cliente.DoesNotExist:
+                    return Response(
+                        {'error': 'Cliente não encontrado'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                # Se não foi informado cliente_id, pega o primeiro do escritório
+                cliente = Cliente.objects.filter(escritorio=escritorio).first()
+                if not cliente:
+                    return Response(
+                        {'error': 'Nenhum cliente encontrado no escritório. Por favor, cadastre um cliente primeiro.'},
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Cria documento temporário
+            documento = Documento.objects.create(
+                escritorio=escritorio,
+                cliente=cliente,
+                titulo=f'Documento Escaneado - {timezone.now().strftime("%d/%m/%Y %H:%M")}',
+                nome_original='documento_escaneado.pdf',
+                tipo_arquivo='pdf',
+                tamanho=len(texto),
+                texto_extraido=texto,
+                usuario_upload=usuario
+            )
+            print(f"📝 Documento temporário criado: {documento.titulo} (ID: {documento.id})")
         
-        # Cria documento temporário
-        documento = Documento.objects.create(
-            escritorio=escritorio,
-            cliente=cliente,
-            titulo=f'Documento Escaneado - {timezone.now().strftime("%d/%m/%Y %H:%M")}',
-            nome_original='documento_escaneado.pdf',
-            tipo_arquivo='pdf',
-            tamanho=len(texto),
-            texto_extraido=texto,
-            usuario_upload=usuario
-        )
+        # Validações
+        if tipo_analise == 'personalizado' and not prompt_personalizado:
+            return Response(
+                {'error': 'Prompt personalizado é obrigatório para análise personalizada'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         
         # Cria análise
         analise = DocumentoAnaliseIA.objects.create(
@@ -463,6 +480,7 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
             modelo_ia=modelo_ia,
             status='pendente'
         )
+        print(f"🔬 Análise criada (ID: {analise.id}) para documento: {documento.titulo}")
         
         # Processa análise
         try:
@@ -513,9 +531,20 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
             modelo=analise.modelo_ia
         )
         
+        # 🐛 DEBUG
+        print(f"🔍 Resultado da IA:")
+        print(f"  - Status: {resultado.get('status')}")
+        print(f"  - Resultado chars: {len(resultado.get('resultado', ''))}")
+        print(f"  - Tokens: {resultado.get('tokens_usados')}")
+        print(f"  - Custo: {resultado.get('custo_estimado')}")
+        print(f"  - Erro: {resultado.get('mensagem_erro')}")
+        
         # Atualiza análise
         try:
-            analise.resultado = resultado['resultado']
+            resultado_texto = resultado['resultado']
+            print(f"🔍 Salvando resultado com {len(resultado_texto)} caracteres")
+            
+            analise.resultado = resultado_texto
             analise.tokens_usados = resultado['tokens_usados']
             analise.custo_estimado = resultado['custo_estimado']
             
@@ -530,8 +559,14 @@ class DocumentoAnaliseIAListCreateView(generics.ListCreateAPIView):
                 analise.mensagem_erro = resultado['mensagem_erro']
             
             analise.save()
+            print(f"✅ Análise salva com sucesso")
+            
+            # Recarrega do banco para verificar
+            analise.refresh_from_db()
+            print(f"🔍 Após reload - Resultado chars: {len(analise.resultado) if analise.resultado else 0}")
             
         except Exception as save_error:
+            print(f"❌ Erro ao salvar análise: {str(save_error)}")
             analise.status = 'erro'
             analise.mensagem_erro = f"Erro ao salvar: {str(save_error)}"
             analise.save()

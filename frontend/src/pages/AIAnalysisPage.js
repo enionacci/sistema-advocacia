@@ -45,52 +45,52 @@ const TIPOS_ANALISE = [
 // Modelos GPT principais para análise de documentos
 const MODELOS_GPT = [
   { 
-    id: 'gpt-5-nano', 
+    id: 'gpt-5-nano-2025-08-07', 
     name: 'GPT-5 Nano', 
     category: 'GPT-5',
     cost_level: 'baixo',
     speed: 'muito rápida',
-    description: 'Rápido e econômico, contexto 400.000 tokens'
+    description: 'Ideal para documentos pequenos (até 3 páginas ou resumos)'
   },
   { 
-    id: 'gpt-5-mini', 
+    id: 'gpt-5-mini-2025-08-07', 
     name: 'GPT-5 Mini', 
     category: 'GPT-5',
     cost_level: 'Médio',
     speed: 'rápida',
-    description: 'Modelo mais recente, contexto 400.000 tokens'
+    description: 'Bom para documentos curtos (até 5 páginas)'
   },
   { 
-    id: 'gpt-5', 
+    id: 'gpt-5-2025-08-07', 
     name: 'GPT-5', 
     category: 'GPT-5',
     cost_level: 'Alto',
     speed: 'média',
-    description: 'Modelo mais recente, contexto 400.000 tokens'
+    description: 'Para documentos médios (até 7 páginas)'
   },
   { 
-    id: 'gpt-4.1-nano', 
+    id: 'gpt-4.1-nano-2025-04-14', 
     name: 'GPT-4.1 Nano', 
     category: 'GPT-4.1',
     cost_level: 'baixo',
     speed: 'muito rápida',
-    description: 'Rápido e econômico, contexto 1.047.576 tokens'
+    description: '⭐ RECOMENDADO para documentos a partir de 8 páginas - 1M tokens'
   },
   { 
-    id: 'gpt-4.1-mini', 
+    id: 'gpt-4.1-mini-2025-04-14', 
     name: 'GPT-4.1 Mini', 
     category: 'GPT-4.1',
     cost_level: 'Médio',
     speed: 'rápida',
-    description: 'Modelo mais recente, contexto 1.047.576 tokens'
+    description: '⭐ Melhor custo-benefício para petições e contratos extensos - 1M tokens'
   },
   { 
-    id: 'gpt-4.1', 
+    id: 'gpt-4.1-2025-04-14', 
     name: 'GPT-4.1', 
     category: 'GPT-4.1',
     cost_level: 'alto',
     speed: 'média',
-    description: 'Versão mais inteligente, contexto 1.047.576 tokens'
+    description: '⭐ Máxima precisão para processos completos e documentos complexos - 1M tokens'
   },
 ];
 
@@ -224,6 +224,14 @@ const AIAnalysisPage = () => {
             {success}
           </Alert>
         )}
+
+        <Alert severity="info" sx={{ mb: 3 }}>
+          <Typography variant="body2">
+            <strong>💡 Importante:</strong> Os modelos <strong>GPT-5</strong> suportam até <strong>7 páginas</strong>. 
+            Para documentos maiores (petições, contratos extensos, processos completos), 
+            utilize obrigatoriamente os modelos <strong>GPT-4.1</strong> que suportam até <strong>1 milhão de tokens</strong> de contexto.
+          </Typography>
+        </Alert>
 
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
@@ -377,7 +385,7 @@ const AIAnalysisPage = () => {
                 label="Modelo GPT"
                 value={modeloGPT}
                 onChange={(e) => setModeloGPT(e.target.value)}
-                helperText={`${modelosGPT.length} modelos principais disponíveis`}
+                helperText="⚠️ GPT-5 suporta até 7 páginas. Para documentos maiores, use GPT-4.1 (1M tokens)"
                 disabled={processing}
               >
                 {modelosGPT.map((modelo) => (

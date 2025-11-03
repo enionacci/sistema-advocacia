@@ -188,6 +188,12 @@ class AuditMiddleware(MiddlewareMixin):
                     'documento': 'documentos.Documento',
                     'categoria': 'documentos.Categoria',
                     'tag': 'documentos.Tag',
+                    'processo': 'processos.Processo',
+                    'parte': 'processos.Parte',
+                    'movimentacao': 'processos.Movimentacao',
+                    'movimentacoe': 'processos.Movimentacao',  # Plural irregular
+                    'prazo': 'processos.Prazo',
+                    'audiencia': 'processos.Audiencia',
                 }
                 
                 model_path = model_mapping.get(model_name)

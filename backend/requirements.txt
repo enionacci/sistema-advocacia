@@ -46,6 +46,7 @@ murmurhash==1.0.13
 networkx==3.5
 numpy==1.26.4
 oauthlib==3.3.1
+ollama
 openai==2.0.0
 packaging==25.0
 pandas==2.3.3

@@ -10,6 +10,7 @@ import logging
 from .models import Documento, DocumentoAnonimizacao, AnonimizacaoItem
 from .serializers import DocumentoListSerializer
 from .anonymization_service import AnonymizationService
+import json
 
 logger = logging.getLogger(__name__)
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 @permission_classes([IsAuthenticated])
 def anonymize_document(request, documento_id):
     """
-    Anonimiza um documento usando IA ou regex
+    Anonimiza um documento usando regex
     """
     try:
         documento = get_object_or_404(Documento, id=documento_id)
@@ -29,7 +30,6 @@ def anonymize_document(request, documento_id):
             }, status=status.HTTP_403_FORBIDDEN)
         
         # Parâmetros de configuração
-        tipo_anonimizacao = request.data.get('tipo', 'ia')  # 'ia' ou 'regex'
         incluir_nomes = request.data.get('incluir_nomes', False)
         incluir_enderecos = request.data.get('incluir_enderecos', False)
         incluir_emails = request.data.get('incluir_emails', True)
@@ -37,7 +37,6 @@ def anonymize_document(request, documento_id):
         incluir_cpf_rg = request.data.get('incluir_cpf_rg', True)
         
         configuracao = {
-            'tipo': tipo_anonimizacao,
             'incluir_nomes': incluir_nomes,
             'incluir_enderecos': incluir_enderecos,
             'incluir_emails': incluir_emails,
@@ -46,9 +45,6 @@ def anonymize_document(request, documento_id):
         }
         
         logger.info(f"🔒 Iniciando anonimização do documento {documento_id} com configuração: {configuracao}")
-        
-        # Inicializar serviço de anonimização
-        service = AnonymizationService()
         
         with transaction.atomic():
             # Criar registro de anonimização
@@ -65,28 +61,26 @@ def anonymize_document(request, documento_id):
                 anonimizar_telefones=incluir_telefones,
                 anonimizar_emails=incluir_emails
             )
-            
-            # Processar anonimização
-            sucesso = service.anonymize_document(anonimizacao)
-            
-            if not sucesso:
-                return Response({
-                    'error': f'Erro na anonimização: {anonimizacao.mensagem_erro}'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-            
-            # Buscar o número de substituições
-            total_substituicoes = anonimizacao.itens.count()
-            
-            logger.info(f"✅ Anonimização concluída: {total_substituicoes} substituições realizadas")
-            
-            return Response({
-                'success': True,
-                'message': f'Documento anonimizado com sucesso usando o motor Presidio. {total_substituicoes} substituições realizadas.',
-                'anonimizacao_id': anonimizacao.id,
-                'total_substituicoes': total_substituicoes,
-                'metodo': 'Presidio (spaCy + Regex)',
-                'configuracao': configuracao
-            }, status=status.HTTP_200_OK)
+
+        service = AnonymizationService()
+        sucesso = service.anonymize_document(anonimizacao)
+        
+        if not sucesso:
+            return Response({'error': f'Erro na anonimização com Regex: {anonimizacao.mensagem_erro}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        total_substituicoes = anonimizacao.itens.count()
+        metodo = 'Regex (Local)'
+
+        logger.info(f"✅ Anonimização concluída via {metodo}: {total_substituicoes} substituições realizadas")
+        
+        return Response({
+            'success': True,
+            'message': f'Documento anonimizado com sucesso usando {metodo}.',
+            'anonimizacao_id': anonimizacao.id,
+            'total_substituicoes': total_substituicoes,
+            'metodo': metodo,
+            'configuracao': configuracao
+        }, status=status.HTTP_200_OK)
     
     except Exception as e:
         logger.error(f"❌ Erro na anonimização: {str(e)}")

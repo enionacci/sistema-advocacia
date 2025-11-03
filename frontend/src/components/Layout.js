@@ -54,6 +54,7 @@ import {
   Scanner as ScannerIcon,
   Psychology as AIIcon,
   Security as SecurityIcon,
+  Gavel as GavelIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -71,6 +72,7 @@ const Layout = ({ children }) => {
   const [clientesOpen, setClientesOpen] = useState(false);
   const [auditoriaOpen, setAuditoriaOpen] = useState(false);
   const [arquivosOpen, setArquivosOpen] = useState(false);
+  const [processosOpen, setProcessosOpen] = useState(false);
 
   // Handlers
   const handleDrawerToggle = () => {
@@ -126,6 +128,28 @@ const Layout = ({ children }) => {
           label: 'Novo Cliente',
           icon: <AddIcon />,
           path: '/clientes/novo',
+          permission: 'criar_cliente',
+        },
+      ],
+    },
+    {
+      id: 'processos',
+      label: 'Processos',
+      icon: <GavelIcon />,
+      permission: 'ver_cliente', // Usa mesma permissão de clientes por enquanto
+      submenu: [
+        {
+          id: 'processos-listar',
+          label: 'Listar Processos',
+          icon: <ListIcon />,
+          path: '/processos',
+          permission: 'ver_cliente',
+        },
+        {
+          id: 'processos-novo',
+          label: 'Novo Processo',
+          icon: <AddIcon />,
+          path: '/processos/novo',
           permission: 'criar_cliente',
         },
       ],
@@ -253,6 +277,9 @@ const Layout = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {location.pathname === '/' && 'Clientes'}
             {location.pathname === '/clientes/novo' && 'Novo Cliente'}
+            {location.pathname === '/processos' && 'Processos'}
+            {location.pathname === '/processos/novo' && 'Novo Processo'}
+            {location.pathname.startsWith('/processos/') && !location.pathname.includes('/novo') && 'Detalhes do Processo'}
             {location.pathname === '/scanner' && 'Arquivos - Escanear'}
             {location.pathname === '/anonimizar' && 'Arquivos - Anonimizar'}
             {location.pathname === '/analise-ia' && 'Arquivos - Análise IA'}
@@ -378,6 +405,7 @@ const Layout = ({ children }) => {
                     <ListItemButton
                       onClick={() => {
                         if (item.id === 'clientes') setClientesOpen(!clientesOpen);
+                        if (item.id === 'processos') setProcessosOpen(!processosOpen);
                         if (item.id === 'arquivos') setArquivosOpen(!arquivosOpen);
                         if (item.id === 'auditoria') setAuditoriaOpen(!auditoriaOpen);
                       }}
@@ -390,6 +418,7 @@ const Layout = ({ children }) => {
                       <ListItemIcon>{item.icon}</ListItemIcon>
                       <ListItemText primary={item.label} />
                       {(item.id === 'clientes' && clientesOpen) ||
+                       (item.id === 'processos' && processosOpen) ||
                        (item.id === 'arquivos' && arquivosOpen) ||
                        (item.id === 'auditoria' && auditoriaOpen) ? (
                         <ExpandLess />
@@ -401,6 +430,7 @@ const Layout = ({ children }) => {
                     <Collapse
                       in={
                         (item.id === 'clientes' && clientesOpen) ||
+                        (item.id === 'processos' && processosOpen) ||
                         (item.id === 'arquivos' && arquivosOpen) ||
                         (item.id === 'auditoria' && auditoriaOpen)
                       }
