@@ -96,8 +96,12 @@ class AuditMiddleware(MiddlewareMixin):
         if not hasattr(request, 'user') or not request.user.is_authenticated:
             return False
         
-        # Ignora se não tem perfil
-        if not hasattr(request.user, 'perfil'):
+        # Ignora se não tem perfil ou perfil é None
+        if not hasattr(request.user, 'perfil') or not request.user.perfil:
+            return False
+        
+        # Ignora se não tem escritório
+        if not hasattr(request.user.perfil, 'escritorio') or not request.user.perfil.escritorio:
             return False
         
         # Ignora paths configurados
@@ -118,46 +122,53 @@ class AuditMiddleware(MiddlewareMixin):
     def _create_audit_log(self, request, response):
         """Cria o registro de auditoria."""
         
-        usuario = request.user
-        acao = self.METHOD_TO_ACTION.get(request.method, 'VIEW')
-        
-        # Extrai informações do objeto afetado
-        objeto = self._get_affected_object(request, response)
-        descricao = self._generate_description(request, acao, objeto)
-        
-        # Prepara dados do log
-        log_data = {
-            'usuario': usuario,
-            'acao': acao,
-            'descricao': descricao,
-            'endpoint': request.path,
-            'metodo_http': request.method,
-            'ip_address': get_client_ip(request),
-            'user_agent': request.META.get('HTTP_USER_AGENT', '')[:500],
-            'sucesso': True,
-        }
-        
-        # Adiciona objeto se identificado
-        if objeto:
-            log_data['objeto'] = objeto
-        
-        # Adiciona dados antigos (para UPDATE/DELETE)
-        if hasattr(request, '_audit_old_data'):
-            log_data['dados_antigos'] = request._audit_old_data
-        
-        # Adiciona dados novos (para CREATE/UPDATE)
-        if acao in ['CREATE', 'UPDATE']:
-            log_data['dados_novos'] = self._get_object_data_from_response(response)
-        
-        # Calcula campos alterados (para UPDATE)
-        if acao == 'UPDATE' and hasattr(request, '_audit_old_data'):
-            log_data['campos_alterados'] = self._get_changed_fields(
-                request._audit_old_data,
-                log_data.get('dados_novos', {})
-            )
-        
-        # Cria o log
-        AuditLog.criar_log(**log_data)
+        try:
+            usuario = request.user
+            acao = self.METHOD_TO_ACTION.get(request.method, 'VIEW')
+            
+            # Extrai informações do objeto afetado
+            objeto = self._get_affected_object(request, response)
+            descricao = self._generate_description(request, acao, objeto)
+            
+            # Prepara dados do log
+            log_data = {
+                'usuario': usuario,
+                'acao': acao,
+                'descricao': descricao,
+                'endpoint': request.path,
+                'metodo_http': request.method,
+                'ip_address': get_client_ip(request),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:500],
+                'sucesso': True,
+            }
+            
+            # Adiciona objeto se identificado
+            if objeto:
+                log_data['objeto'] = objeto
+            
+            # Adiciona dados antigos (para UPDATE/DELETE)
+            if hasattr(request, '_audit_old_data'):
+                log_data['dados_antigos'] = request._audit_old_data
+            
+            # Adiciona dados novos (para CREATE/UPDATE)
+            if acao in ['CREATE', 'UPDATE']:
+                log_data['dados_novos'] = self._get_object_data_from_response(response)
+            
+            # Calcula campos alterados (para UPDATE)
+            if acao == 'UPDATE' and hasattr(request, '_audit_old_data'):
+                log_data['campos_alterados'] = self._get_changed_fields(
+                    request._audit_old_data,
+                    log_data.get('dados_novos', {})
+                )
+            
+            # Cria o log
+            AuditLog.criar_log(**log_data)
+            
+        except Exception as e:
+            # Log mais detalhado do erro
+            print(f"❌ Erro detalhado ao criar audit log: {type(e).__name__}: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
     
     def _get_affected_object(self, request, response):
         """Tenta identificar o objeto afetado pela requisição."""
@@ -177,6 +188,12 @@ class AuditMiddleware(MiddlewareMixin):
                     'documento': 'documentos.Documento',
                     'categoria': 'documentos.Categoria',
                     'tag': 'documentos.Tag',
+                    'processo': 'processos.Processo',
+                    'parte': 'processos.Parte',
+                    'movimentacao': 'processos.Movimentacao',
+                    'movimentacoe': 'processos.Movimentacao',  # Plural irregular
+                    'prazo': 'processos.Prazo',
+                    'audiencia': 'processos.Audiencia',
                 }
                 
                 model_path = model_mapping.get(model_name)
@@ -201,20 +218,27 @@ class AuditMiddleware(MiddlewareMixin):
                 # Serializa campos importantes do objeto
                 data = {}
                 for field in obj._meta.fields:
-                    field_name = field.name
-                    value = getattr(obj, field_name, None)
-                    
-                    # Converte para tipos serializáveis
-                    if hasattr(value, 'isoformat'):  # datetime
-                        value = value.isoformat()
-                    elif hasattr(value, 'id'):  # ForeignKey
-                        value = value.id
-                    
-                    data[field_name] = str(value) if value is not None else None
+                    try:
+                        field_name = field.name
+                        value = getattr(obj, field_name, None)
+                        
+                        # Converte para tipos serializáveis
+                        if value is None:
+                            data[field_name] = None
+                        elif hasattr(value, 'isoformat'):  # datetime
+                            data[field_name] = value.isoformat()
+                        elif hasattr(value, 'id'):  # ForeignKey
+                            data[field_name] = value.id
+                        else:
+                            data[field_name] = str(value)
+                    except Exception as field_error:
+                        # Se falhar em um campo específico, continua com os outros
+                        data[field_name] = f"<erro ao acessar: {str(field_error)}>"
+                        continue
                 
                 return data
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"⚠️ Erro ao obter dados do objeto: {str(e)}")
         
         return {}
     
@@ -257,8 +281,18 @@ class AuditMiddleware(MiddlewareMixin):
         verbo = acao_map.get(acao, 'acessou')
         
         if objeto:
-            modelo = objeto.__class__.__name__
-            return f"{verbo} {modelo}: {str(objeto)}"
+            try:
+                modelo = objeto.__class__.__name__
+                objeto_str = str(objeto)
+                return f"{verbo} {modelo}: {objeto_str}"
+            except Exception as e:
+                # Se falhar ao converter objeto para string, usa apenas o nome do modelo
+                modelo = objeto.__class__.__name__
+                try:
+                    objeto_id = objeto.id if hasattr(objeto, 'id') else 'N/A'
+                    return f"{verbo} {modelo} (ID: {objeto_id})"
+                except:
+                    return f"{verbo} {modelo}"
         
         # Descrição genérica baseada no endpoint
         path_parts = request.path.split('/')

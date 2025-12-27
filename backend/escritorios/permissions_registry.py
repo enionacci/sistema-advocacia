@@ -209,83 +209,107 @@ class PermissionsRegistry:
         ),
     ]
     
-    # ==================== DOCUMENTOS ====================
+    # ==================== DOCUMENTOS (Cliente) ====================
     DOCUMENTOS = [
         PermissionDefinition(
             codename='ver_documento',
-            nome='Ver Documento',
+            nome='Ver Documentos do Cliente',
             categoria='Documentos',
-            descricao='Permite visualizar documentos'
+            descricao='Permite visualizar documentos vinculados a clientes'
         ),
         PermissionDefinition(
             codename='criar_documento',
-            nome='Criar Documento',
+            nome='Criar Documentos para Cliente',
             categoria='Documentos',
-            descricao='Permite fazer upload de novos documentos'
+            descricao='Permite fazer upload de novos documentos para clientes'
         ),
         PermissionDefinition(
             codename='editar_documento',
-            nome='Editar Documento',
+            nome='Editar Documentos do Cliente',
             categoria='Documentos',
-            descricao='Permite editar metadados de documentos existentes'
+            descricao='Permite editar metadados de documentos de clientes'
         ),
         PermissionDefinition(
             codename='deletar_documento',
-            nome='Deletar Documento',
+            nome='Deletar Documentos do Cliente',
             categoria='Documentos',
-            descricao='Permite remover documentos do sistema'
+            descricao='Permite remover documentos de clientes'
         ),
         PermissionDefinition(
             codename='download_documento',
-            nome='Download de Documento',
+            nome='Download de Documento do Cliente',
             categoria='Documentos',
-            descricao='Permite fazer download de documentos'
+            descricao='Permite fazer download de documentos de clientes'
         ),
         PermissionDefinition(
             codename='gerenciar_categorias',
-            nome='Gerenciar Categorias',
+            nome='Gerenciar Categorias de Documentos',
             categoria='Documentos',
             descricao='Permite criar, editar e deletar categorias de documentos'
         ),
         PermissionDefinition(
             codename='gerenciar_tags',
-            nome='Gerenciar Tags',
+            nome='Gerenciar Tags de Documentos',
             categoria='Documentos',
             descricao='Permite criar, editar e deletar tags de documentos'
         ),
     ]
     
-    # ==================== SCANNER & IA ====================
-    SCANNER_IA = [
+    # ==================== ARQUIVOS (Geral) ====================
+    ARQUIVOS = [
         PermissionDefinition(
-            codename='escanear_documento',
-            nome='Escanear Documento',
-            categoria='Scanner & IA',
-            descricao='Permite fazer upload de documentos escaneados para OCR'
+            codename='ver_arquivos',
+            nome='Ver Arquivos Gerais',
+            categoria='Arquivos',
+            descricao='Permite visualizar o módulo de arquivos gerais e análises'
         ),
         PermissionDefinition(
-            codename='solicitar_analise_ia',
-            nome='Solicitar Análise IA',
-            categoria='Scanner & IA',
-            descricao='Permite solicitar análise de documentos por IA (GPT)'
+            codename='criar_arquivo',
+            nome='Criar Arquivo Geral',
+            categoria='Arquivos',
+            descricao='Permite fazer upload de novos arquivos no módulo geral'
         ),
         PermissionDefinition(
-            codename='ver_analise_ia',
-            nome='Ver Análise IA',
-            categoria='Scanner & IA',
-            descricao='Permite visualizar análises de IA realizadas'
+            codename='editar_arquivo',
+            nome='Editar Arquivo Geral',
+            categoria='Arquivos',
+            descricao='Permite editar metadados de arquivos gerais'
         ),
         PermissionDefinition(
-            codename='editar_analise_ia',
-            nome='Editar Análise IA',
-            categoria='Scanner & IA',
-            descricao='Permite editar e corrigir análises de IA'
+            codename='deletar_arquivo',
+            nome='Deletar Arquivo Geral',
+            categoria='Arquivos',
+            descricao='Permite remover arquivos gerais do sistema'
         ),
         PermissionDefinition(
-            codename='deletar_analise_ia',
-            nome='Deletar Análise IA',
-            categoria='Scanner & IA',
-            descricao='Permite remover análises de IA do sistema'
+            codename='download_arquivo',
+            nome='Download de Arquivo Geral',
+            categoria='Arquivos',
+            descricao='Permite fazer download de arquivos gerais'
+        ),
+        PermissionDefinition(
+            codename='escanear_arquivo',
+            nome='Escanear Novo Arquivo',
+            categoria='Arquivos',
+            descricao='Permite usar a função de OCR para extrair texto de arquivos'
+        ),
+        PermissionDefinition(
+            codename='anonimizar_arquivo',
+            nome='Anonimizar Arquivos',
+            categoria='Arquivos',
+            descricao='Permite acessar e gerenciar a anonimização de dados em arquivos'
+        ),
+        PermissionDefinition(
+            codename='analisar_arquivo_ia',
+            nome='Analisar Arquivo com IA',
+            categoria='Arquivos',
+            descricao='Permite solicitar e visualizar análises de arquivos por IA'
+        ),
+        PermissionDefinition(
+            codename='deletar_analise_arquivo',
+            nome='Deletar Análise de Arquivo',
+            categoria='Arquivos',
+            descricao='Permite remover análises de IA de arquivos'
         ),
     ]
     
@@ -300,7 +324,7 @@ class PermissionsRegistry:
             cls.FINANCEIRO +
             cls.PROCESSOS +
             cls.DOCUMENTOS +
-            cls.SCANNER_IA
+            cls.ARQUIVOS
         )
     
     @classmethod
@@ -314,6 +338,7 @@ class PermissionsRegistry:
             'Financeiro': cls.FINANCEIRO,
             'Processos': cls.PROCESSOS,
             'Documentos': cls.DOCUMENTOS,
+            'Arquivos': cls.ARQUIVOS,
         }
     
     @classmethod
@@ -357,23 +382,23 @@ class PermissionsRegistry:
             
             if created:
                 created_count += 1
-                print(f"✅ Permissão criada: {perm_def.codename} - {perm_def.nome}")
+                print(f"Permissão criada: {perm_def.codename} - {perm_def.nome}")
             else:
                 # Atualiza o nome se mudou
                 if perm.nome != perm_def.nome:
                     perm.nome = perm_def.nome
                     perm.save()
                     updated_count += 1
-                    print(f"🔄 Permissão atualizada: {perm_def.codename}")
+                    print(f"Permissão atualizada: {perm_def.codename}")
         
         # Identificar permissões obsoletas
         obsolete_codenames = existing_codenames - registry_codenames
         if obsolete_codenames:
-            print(f"\n⚠️  Permissões obsoletas encontradas (não estão no registro):")
+            print(f"\nPermissões obsoletas encontradas (não estão no registro):")
             for codename in obsolete_codenames:
                 print(f"   - {codename}")
         
-        print(f"\n📊 Resumo da sincronização:")
+        print(f"\nResumo da sincronização:")
         print(f"   - Permissões criadas: {created_count}")
         print(f"   - Permissões atualizadas: {updated_count}")
         print(f"   - Permissões obsoletas: {len(obsolete_codenames)}")
@@ -393,6 +418,8 @@ class PermissionsRegistry:
                 'ver_analise', 'criar_analise', 'editar_analise',
                 'ver_processo', 'criar_processo', 'editar_processo',
                 'ver_documento', 'criar_documento', 'editar_documento', 'deletar_documento', 'download_documento',
+                'ver_arquivos', 'criar_arquivo', 'editar_arquivo', 'deletar_arquivo', 'download_arquivo',
+                'escanear_arquivo', 'anonimizar_arquivo', 'analisar_arquivo_ia', 'deletar_analise_arquivo',
                 'ver_relatorios',
             ],
             'Secretária': [
@@ -400,12 +427,14 @@ class PermissionsRegistry:
                 'ver_consulta', 'criar_consulta',
                 'ver_processo', 'criar_processo',
                 'ver_documento', 'criar_documento', 'editar_documento', 'download_documento',
+                'ver_arquivos', 'criar_arquivo', 'editar_arquivo', 'download_arquivo', 'escanear_arquivo',
             ],
             'Assistente': [
                 'ver_cliente',
                 'ver_consulta',
                 'ver_processo',
                 'ver_documento', 'download_documento',
+                'ver_arquivos', 'download_arquivo',
             ],
             'Financeiro': [
                 'ver_cliente',

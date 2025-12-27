@@ -25,30 +25,31 @@ SIMPLE_JWT = {
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-z%tlzrqknoy6j#z-w^i15ri!i-4=*8z%plijxgz0ekef9)r2&y')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv('DEBUG', 'True').lower() == 'true'
 
-# ALLOWED_HOSTS - aceita de variável de ambiente ou usa padrões
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1,0.0.0.0').split(',')
-if DEBUG:
-    ALLOWED_HOSTS.append('*')  # Em desenvolvimento, aceita qualquer host
+# ALLOWED_HOSTS - configuração melhorada
+ALLOWED_HOSTS = [
+    'localhost',
+    '127.0.0.1',
+    '0.0.0.0',
+    'api.advocacia.nacciadvocacia.com.br',  # Seu novo domínio da API
+]
 
+if DEBUG:
+    ALLOWED_HOSTS.append('*')
 
 # Application definition
-
 INSTALLED_APPS = [
     'clientes',
     'consultas',
     'analises',
     'escritorios',
     'documentos',  # Nova app
+    'processos',  # App de processos judiciais
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -56,22 +57,20 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework', 
-    'corsheaders',
+    'corsheaders',  # Importante que esteja aqui
     'djoser',
-
 ]
 
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware', 
+    'corsheaders.middleware.CorsMiddleware',  # DEVE SER O PRIMEIRO!
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'escritorios.audit_middleware.AuditMiddleware',  # Middleware de auditoria (antes do SubscriptionCheck)
-    'escritorios.middleware.SubscriptionCheckMiddleware', # Nosso middleware de verificação
+    'escritorios.audit_middleware.AuditMiddleware',
+    'escritorios.middleware.SubscriptionCheckMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    # 'django.middleware.clickjacking.XFrameOptionsMiddleware',  # DESABILITADO para permitir iframes
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -93,10 +92,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-
 # Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -108,10 +104,7 @@ DATABASES = {
     }
 }
 
-
 # Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
@@ -127,22 +120,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
-# https://docs.djangoproject.com/en/5.2/topics/i18n/
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'UTC'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.2/howto/static-files/
-
+# Static files
 STATIC_URL = 'static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
@@ -151,36 +135,55 @@ MEDIA_URL = 'media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# CORS Configuration - CONFIGURAÇÃO COMPLETA
+CORS_ALLOW_ALL_ORIGINS = False  # Segurança em produção
+
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:3000",  # Desenvolvimento local
-    "http://localhost:3001",  # Desenvolvimento local (porta alternativa)
-    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção (Easypanel)
-    "https://advocacia.nacciadvocacia.com.br",  # Frontend em produção (domínio customizado)
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://advocacia.nacciadvocacia.com.br",  # Frontend
 ]
 
-# Origens confiáveis para CSRF
+# Headers permitidos
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
+
+# Métodos permitidos
+CORS_ALLOW_METHODS = [
+    'DELETE',
+    'GET',
+    'OPTIONS',
+    'PATCH',
+    'POST',
+    'PUT',
+]
+
+# Permitir credenciais
+CORS_ALLOW_CREDENTIALS = True
+
+# CSRF Configuration
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
-    "https://advocacia-advocacia-frontend.6hrnsw.easypanel.host",  # Frontend em produção (Easypanel)
-    "https://advocacia.nacciadvocacia.com.br",  # Frontend em produção (domínio customizado)
+    "https://advocacia.nacciadvocacia.com.br",
 ]
 
-# Permitir iframes do frontend (para visualizador de documentos)
-# SAMEORIGIN só funciona se for mesma origem. Como frontend está em localhost:3000
-# e backend em 127.0.0.1:8000, precisamos desabilitar ou usar ALLOW-FROM
-# Para desenvolvimento, vamos desabilitar a proteção X-Frame-Options
-X_FRAME_OPTIONS = None  # Desabilita proteção (apenas desenvolvimento!)
-# Em produção, use uma solução mais segura
+# Frame options (para desenvolvimento)
+X_FRAME_OPTIONS = None
 
-# Permitir credenciais CORS
-CORS_ALLOW_CREDENTIALS = True
-
+# REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
@@ -193,22 +196,18 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 10,
 }
 
-# Configuração do Djoser (Autenticação)
+# Djoser Configuration
 DJOSER = {
     'SERIALIZERS': {
         'current_user': 'escritorios.serializers.UserWithProfileSerializer',
     },
 }
 
-# config/settings.py
-MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
-
+# Outras configurações
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# Configuração da Criptografia
 SALT_KEY = os.getenv('FERNET_KEY')
+FIELD_ENCRYPTION_KEY = os.getenv('FERNET_KEY')
 
-# Configuração de Email (para desenvolvimento)
+# Email (desenvolvimento)
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 DEFAULT_FROM_EMAIL = 'nao-responda@sistemadeadvocacia.com'

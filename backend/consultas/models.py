@@ -9,7 +9,9 @@ class Consulta(models.Model):
     data_criacao = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Consulta para {self.cliente.nome_completo} em {self.data_criacao.strftime('%d/%m/%Y')}"
+        if self.cliente:
+            return f"Consulta para {self.cliente.nome_completo} em {self.data_criacao.strftime('%d/%m/%Y')}"
+        return f"Consulta em {self.data_criacao.strftime('%d/%m/%Y')}"
 
     def delete(self, *args, **kwargs):
         # Primeiro, exclui o arquivo de áudio do armazenamento.

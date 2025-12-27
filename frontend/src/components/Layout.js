@@ -53,6 +53,8 @@ import {
   BarChart as StatsIcon,
   Scanner as ScannerIcon,
   Psychology as AIIcon,
+  Security as SecurityIcon,
+  Gavel as GavelIcon,
 } from '@mui/icons-material';
 
 const drawerWidth = 260;
@@ -69,7 +71,8 @@ const Layout = ({ children }) => {
   const [anchorElUser, setAnchorElUser] = useState(null);
   const [clientesOpen, setClientesOpen] = useState(false);
   const [auditoriaOpen, setAuditoriaOpen] = useState(false);
-  const [scannerOpen, setScannerOpen] = useState(false);
+  const [arquivosOpen, setArquivosOpen] = useState(false);
+  const [processosOpen, setProcessosOpen] = useState(false);
 
   // Handlers
   const handleDrawerToggle = () => {
@@ -130,31 +133,67 @@ const Layout = ({ children }) => {
       ],
     },
     {
-      id: 'scanner-ia',
-      label: 'Scanner & IA',
-      icon: <ScannerIcon />,
-      permission: 'ver_documento',
+      id: 'processos',
+      label: 'Processos',
+      icon: <GavelIcon />,
+      permission: 'ver_cliente', // Usa mesma permissão de clientes por enquanto
       submenu: [
         {
-          id: 'scanner-upload',
-          label: 'Escanear Documento',
+          id: 'processos-listar',
+          label: 'Listar Processos',
+          icon: <ListIcon />,
+          path: '/processos',
+          permission: 'ver_cliente',
+        },
+        {
+          id: 'processos-novo',
+          label: 'Novo Processo',
+          icon: <AddIcon />,
+          path: '/processos/novo',
+          permission: 'criar_cliente',
+        },
+      ],
+    },
+    {
+      id: 'arquivos',
+      label: 'Arquivos',
+      icon: <DocumentIcon />,
+      permission: 'ver_arquivos',
+      submenu: [
+        {
+          id: 'scanner',
+          label: 'Escanear Arquivo',
           icon: <ScannerIcon />,
           path: '/scanner',
-          permission: 'criar_documento',
+          permission: 'escanear_arquivo',
         },
         {
-          id: 'scanner-documentos',
-          label: 'Documentos Escaneados',
-          icon: <DocumentIcon />,
-          path: '/scanner/documentos',
-          permission: 'ver_documento',
+          id: 'anonimizar',
+          label: 'Anonimizar Dados',
+          icon: <SecurityIcon />,
+          path: '/anonimizar',
+          permission: 'anonimizar_arquivo',
         },
         {
-          id: 'scanner-analises',
+          id: 'analise-ia',
+          label: 'Análise com IA',
+          icon: <AIIcon />,
+          path: '/analise-ia',
+          permission: 'analisar_arquivo_ia',
+        },
+        {
+          id: 'documentos-listar',
+          label: 'Arquivos Salvos',
+          icon: <ListIcon />,
+          path: '/documentos',
+          permission: 'ver_arquivos',
+        },
+        {
+          id: 'analises-listar',
           label: 'Análises Realizadas',
           icon: <AIIcon />,
-          path: '/scanner/analises',
-          permission: 'ver_documento',
+          path: '/analises',
+          permission: 'ver_arquivos',
         },
       ],
     },
@@ -238,7 +277,14 @@ const Layout = ({ children }) => {
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
             {location.pathname === '/' && 'Clientes'}
             {location.pathname === '/clientes/novo' && 'Novo Cliente'}
-            {location.pathname.startsWith('/scanner') && 'Scanner & IA'}
+            {location.pathname === '/processos' && 'Processos'}
+            {location.pathname === '/processos/novo' && 'Novo Processo'}
+            {location.pathname.startsWith('/processos/') && !location.pathname.includes('/novo') && 'Detalhes do Processo'}
+            {location.pathname === '/scanner' && 'Arquivos - Escanear'}
+            {location.pathname === '/anonimizar' && 'Arquivos - Anonimizar'}
+            {location.pathname === '/analise-ia' && 'Arquivos - Análise IA'}
+            {location.pathname === '/documentos' && 'Arquivos - Salvos'}
+            {location.pathname === '/analises' && 'Arquivos - Análises'}
             {location.pathname.startsWith('/audit-logs') && 'Auditoria'}
             {location.pathname === '/meu-escritorio' && 'Meu Escritório'}
           </Typography>
@@ -359,7 +405,8 @@ const Layout = ({ children }) => {
                     <ListItemButton
                       onClick={() => {
                         if (item.id === 'clientes') setClientesOpen(!clientesOpen);
-                        if (item.id === 'scanner-ia') setScannerOpen(!scannerOpen);
+                        if (item.id === 'processos') setProcessosOpen(!processosOpen);
+                        if (item.id === 'arquivos') setArquivosOpen(!arquivosOpen);
                         if (item.id === 'auditoria') setAuditoriaOpen(!auditoriaOpen);
                       }}
                       selected={isParentActive(item.submenu.map(sub => sub.path))}
@@ -371,7 +418,8 @@ const Layout = ({ children }) => {
                       <ListItemIcon>{item.icon}</ListItemIcon>
                       <ListItemText primary={item.label} />
                       {(item.id === 'clientes' && clientesOpen) ||
-                       (item.id === 'scanner-ia' && scannerOpen) ||
+                       (item.id === 'processos' && processosOpen) ||
+                       (item.id === 'arquivos' && arquivosOpen) ||
                        (item.id === 'auditoria' && auditoriaOpen) ? (
                         <ExpandLess />
                       ) : (
@@ -382,7 +430,8 @@ const Layout = ({ children }) => {
                     <Collapse
                       in={
                         (item.id === 'clientes' && clientesOpen) ||
-                        (item.id === 'scanner-ia' && scannerOpen) ||
+                        (item.id === 'processos' && processosOpen) ||
+                        (item.id === 'arquivos' && arquivosOpen) ||
                         (item.id === 'auditoria' && auditoriaOpen)
                       }
                       timeout="auto"

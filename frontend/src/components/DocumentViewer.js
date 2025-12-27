@@ -109,10 +109,13 @@ const DocumentViewer = ({
   };
 
   const handleLoadSuccess = () => {
+    console.log('✅ PDF carregado com sucesso!');
     setLoading(false);
   };
 
-  const handleLoadError = () => {
+  const handleLoadError = (e) => {
+    console.error('❌ Erro ao carregar PDF:', e);
+    console.error('URL do PDF:', documento?.arquivo_url);
     setLoading(false);
     setError('Erro ao carregar o documento. Tente fazer o download.');
   };
@@ -240,19 +243,20 @@ const DocumentViewer = ({
                 overflow: 'auto',
               }}>
                 {isPDF && (
-                  <object
-                    data={documento.arquivo_url}
-                    type="application/pdf"
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      border: 'none',
-                    }}
-                    title={documento.titulo}
-                    onLoad={handleLoadSuccess}
-                    onError={handleLoadError}
-                  >
-                    <embed
+                  <>
+                    {console.log('🔍 Tentando carregar PDF:', documento.arquivo_url)}
+                    {/* Botão de teste para abrir em nova aba */}
+                    <Box sx={{ position: 'absolute', top: 20, left: 20, zIndex: 1000 }}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        onClick={() => window.open(documento.arquivo_url, '_blank')}
+                        size="small"
+                      >
+                        Abrir PDF em Nova Aba (Teste)
+                      </Button>
+                    </Box>
+                    <iframe
                       src={documento.arquivo_url}
                       type="application/pdf"
                       style={{
@@ -260,8 +264,11 @@ const DocumentViewer = ({
                         height: '100%',
                         border: 'none',
                       }}
+                      title={documento.titulo}
+                      onLoad={handleLoadSuccess}
+                      onError={handleLoadError}
                     />
-                  </object>
+                  </>
                 )}
 
                 {isImage && (

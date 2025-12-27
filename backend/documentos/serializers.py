@@ -87,11 +87,15 @@ class DocumentoListSerializer(serializers.ModelSerializer):
         return 'Sistema'
 
     def get_arquivo_url(self, obj):
-        """Retorna a URL do arquivo"""
+        """Retorna a URL do arquivo com HTTPS se necessário"""
         if obj.arquivo:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.arquivo.url)
+                url = request.build_absolute_uri(obj.arquivo.url)
+                # Força HTTPS em produção
+                if url.startswith('http://') and 'easypanel' in url:
+                    url = url.replace('http://', 'https://')
+                return url
         return None
 
 
@@ -129,11 +133,15 @@ class DocumentoDetailSerializer(serializers.ModelSerializer):
         return 'Sistema'
 
     def get_arquivo_url(self, obj):
-        """Retorna a URL do arquivo"""
+        """Retorna a URL do arquivo com HTTPS se necessário"""
         if obj.arquivo:
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(obj.arquivo.url)
+                url = request.build_absolute_uri(obj.arquivo.url)
+                # Força HTTPS em produção
+                if url.startswith('http://') and 'easypanel' in url:
+                    url = url.replace('http://', 'https://')
+                return url
         return None
 
     def get_versoes_anteriores(self, obj):

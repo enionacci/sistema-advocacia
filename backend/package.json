@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@mui/lab": "^7.0.1-beta.18",
     "date-fns": "^4.1.0"
   }
 }

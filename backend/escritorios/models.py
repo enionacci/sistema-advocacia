@@ -4,7 +4,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from datetime import timedelta
-from encrypted_fields.fields import EncryptedTextField
+from encrypted_model_fields.fields import EncryptedTextField
 
 class Escritorio(models.Model):
     """Representa um inquilino (tenant), ou seja, um escritório de advocacia."""

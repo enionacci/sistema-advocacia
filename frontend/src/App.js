@@ -26,6 +26,12 @@ import AuditLogStatsPage from './pages/AuditLogStatsPage';
 import DocumentosPage from './pages/DocumentosPage';
 import ScannerPage from './pages/ScannerPage';
 import AnalysesPage from './pages/AnalysesPage';
+import AnonymizePage from './pages/AnonymizePage';
+import AIAnalysisPage from './pages/AIAnalysisPage';
+import ProcessosListPage from './pages/ProcessosListPage';
+import ProcessoCreatePage from './pages/ProcessoCreatePage';
+import ProcessoDetailPage from './pages/ProcessoDetailPage';
+import ProcessoEditPage from './pages/ProcessoEditPage';
 
 function App() {
   const { user } = useAuth();
@@ -135,7 +141,23 @@ function App() {
                     } 
                   />
                   <Route 
-                    path="/scanner/documentos" 
+                    path="/anonimizar" 
+                    element={
+                      <PrivateRoute>
+                        <AnonymizePage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/analise-ia" 
+                    element={
+                      <PrivateRoute>
+                        <AIAnalysisPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/documentos" 
                     element={
                       <PrivateRoute>
                         <DocumentosPage />
@@ -143,10 +165,42 @@ function App() {
                     } 
                   />
                   <Route 
-                    path="/scanner/analises" 
+                    path="/analises" 
                     element={
                       <PrivateRoute>
                         <AnalysesPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/processos" 
+                    element={
+                      <PrivateRoute>
+                        <ProcessosListPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/processos/novo" 
+                    element={
+                      <PrivateRoute>
+                        <ProcessoCreatePage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/processos/:id" 
+                    element={
+                      <PrivateRoute>
+                        <ProcessoDetailPage />
+                      </PrivateRoute>
+                    } 
+                  />
+                  <Route 
+                    path="/processos/:id/editar" 
+                    element={
+                      <PrivateRoute>
+                        <ProcessoEditPage />
                       </PrivateRoute>
                     } 
                   />
